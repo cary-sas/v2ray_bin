@@ -1,7 +1,7 @@
-# Shadowsocks on 380 ARM （安全，好用）
+# Shadowsocks ONLY on 380 ARM （安全，好用）
 support v2ray and xray binary update
 fixed many historical legacy issues
-this project will update bin and package for arm_380_v5  
+this project will update bin and package for [armv7 Merlin-Koolshare](https://github.com/hq450/fancyss/tree/master/fancyss_arm)  
 
 除插件原有功能外，另外
 

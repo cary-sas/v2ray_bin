@@ -212,7 +212,7 @@ base64decode_link(){
 # 有些链接被 url 编码过，所以要先 url 解码
 #urldecode(){ : "${*//+/ }"; echo -e "${_//%/\\x}"; }
 urldecode(){
-	printf $(echo -n $1 | sed 's/\\/\\\\/g;s/\(%\)\([0-9a-fA-F][0-9a-fA-F]\)/\\x\2/g')"\n"
+	printf '%b\n' "$(sed 's/\\/\\\\/g;s/\(%\)\([0-9a-fA-F][0-9a-fA-F]\)/\\x\2/g')"
 }
 ##################################################################################################
 # ss 节点添加解析并更新
@@ -260,7 +260,7 @@ add_ss_servers(){
 }
 
 get_ss_config(){
-	decode_link="$(urldecode $1 |sed 's/[\r\n ]//g' )"	# 有些链接被 url 编码过，所以要先 url 解码
+	decode_link="$1"
 	if [ -z "$decode_link" ];then
 		echo_date "解析失败！！！"
 		return 1
@@ -345,8 +345,11 @@ get_ss_config(){
 	[ -n "$group" ] && group_base64=`echo $group | base64_encode | sed 's/ -//g'`
 	[ -n "$server" ] && server_base64=`echo $server | base64_encode | sed 's/ -//g'`
 	[ -n "$remarks" ] && remarks_base64=`echo $remarks | base64_encode | sed 's/ -//g'`
+
+	[ -n "$node_regexp" ] && incNY=`echo $remarks $server  | sed -n "$node_regexp"` || incNY="Y"
+
 	#把全部服务器节点写入文件 /usr/share/shadowsocks/serverconfig/all_onlineservers
-	[ -n "$group" ] && [ -n "$server" ] && echo $server_base64 $group_base64 $remarks_base64 >> /tmp/all_onlineservers
+	[ -n "$incNY" ] && [ -n "$group" ] && [ -n "$server" ] && echo $server_base64 $group_base64 $remarks_base64 >> /tmp/all_onlineservers
 	#echo ------
 	#echo group: $group
 	#echo remarks: $remarks
@@ -356,7 +359,7 @@ get_ss_config(){
 	#echo ss_v2ray_plugin_tmp: $ss_v2ray_plugin_tmp
 	#echo ss_v2ray_opts_tmp: $ss_v2ray_opts_tmp
 	#echo ------
-	echo "$group" >> /tmp/all_group_info.txt
+	[ -n "$incNY" ] && echo "$group" >> /tmp/all_group_info.txt || return 2
 	[ -n "$group" ] && return 0 || return 1
 }
 
@@ -483,8 +486,11 @@ get_ssr_config(){
 	[ -n "$group" ] && group_base64=`echo $group | base64_encode | sed 's/ -//g'`
 	[ -n "$server" ] && server_base64=`echo $server | base64_encode | sed 's/ -//g'`	
 	[ -n "$remarks" ] && remarks_base64=`echo $remarks | base64_encode | sed 's/ -//g'`
+
+	[ -n "$node_regexp" ] && incNY=`echo $remarks $server  | sed -n "$node_regexp"` || incNY="Y"
+
 	#把全部服务器节点写入文件 /usr/share/shadowsocks/serverconfig/all_onlineservers
-	[ -n "$group" ] && [ -n "$server" ] && echo $server_base64 $group_base64 $remarks_base64 >> /tmp/all_onlineservers
+	[ -n "$incNY" ] && [ -n "$group" ] && [ -n "$server" ] && echo $server_base64 $group_base64 $remarks_base64 >> /tmp/all_onlineservers
 	#echo ------
 	#echo group: $group
 	#echo remarks: $remarks
@@ -497,7 +503,7 @@ get_ssr_config(){
 	#echo obfs: $obfs
 	#echo obfsparam: $obfsparam
 	#echo ------
-	echo "$group" >> /tmp/all_group_info.txt
+	[ -n "$incNY" ] && echo "$group" >> /tmp/all_group_info.txt || return 2
 	[ -n "$group" ] && return 0 || return 1
 
 }
@@ -608,9 +614,10 @@ get_vmess_config(){
 	[ -n "$v2ray_group" ] && group_base64=`echo $v2ray_group | base64_encode | sed 's/ -//g'`
 	[ -n "$v2ray_add" ] && server_base64=`echo $v2ray_add | base64_encode | sed 's/ -//g'`	
 	[ -n "$v2ray_ps" ] && remarks_base64=`echo $v2ray_ps | base64_encode | sed 's/ -//g'`
-	[ -n "$v2ray_group" ] && [ -n "$v2ray_add" ] && echo $server_base64 $group_base64 $remarks_base64 >> /tmp/all_onlineservers
 
-	echo "$v2ray_group" >> /tmp/all_group_info.txt
+	[ -n "$node_regexp" ] && incNY=`echo $v2ray_ps $v2ray_add  | sed -n "$node_regexp"` || incNY="Y"
+	[ -n "$incNY" ] && [ -n "$v2ray_group" ] && [ -n "$v2ray_add" ] && echo $server_base64 $group_base64 $remarks_base64 >> /tmp/all_onlineservers
+	[ -n "$incNY" ] && echo "$v2ray_group" >> /tmp/all_group_info.txt || return 2
 	[ -n "$v2ray_group" ] && return 0 || return 1
 
 
@@ -740,7 +747,7 @@ update_vmess_config(){
 # trojan 节点添加解析并更新
 ##################################################################################################
 get_trojan_config(){
-	decode_link=$(urldecode $1)	# 有些链接被 url 编码过，所以要先 url 解码
+	decode_link="$1"
 	if [ -z "$decode_link" ];then
 		echo_date "解析失败！！！"
 		return 1
@@ -749,7 +756,7 @@ get_trojan_config(){
 	group="$2"
 
 	if [ -n "$(echo -n "$decode_link" | grep "#")" ];then
-		remarks=$(echo -n $decode_link | awk -F'#' '{print $2}' | sed 's/[\r\n ]//g' ) # 因为订阅的 trojan 里面有 \r\n ，所以需要先去除，否则就炸了，只能卸载重装	
+		remarks=$(echo -n $decode_link | awk -F'#' '{print $2}') 
 		decode_link=$(echo -n $decode_link | awk -F'#' '{print $1}')		
 	else
 		remarks="$remarks" 
@@ -782,8 +789,11 @@ get_trojan_config(){
 	[ -n "$group" ] && group_base64=`echo $group | base64_encode | sed 's/ -//g'`
 	[ -n "$server" ] && server_base64=`echo $server | base64_encode | sed 's/ -//g'`
 	[ -n "$remarks" ] && remarks_base64=`echo $remarks | base64_encode | sed 's/ -//g'`
+
+	[ -n "$node_regexp" ] && incNY=`echo $remarks $server  | sed -n "$node_regexp"` || incNY="Y"
+
 	#把全部服务器节点写入文件 /usr/share/shadowsocks/serverconfig/all_onlineservers
-	[ -n "$group" ] && [ -n "$server" ] && echo $server_base64 $group_base64 $remarks_base64 >> /tmp/all_onlineservers
+	[ -n "$incNY" ] && [ -n "$group" ] && [ -n "$server" ] && echo $server_base64 $group_base64 $remarks_base64 >> /tmp/all_onlineservers
 	#echo ------
 	#echo group: $group
 	#echo remarks: $remarks
@@ -791,7 +801,7 @@ get_trojan_config(){
 	#echo server_port: $server_port
 	#echo password: $password
 	#echo ------
-	echo "$group" >> /tmp/all_group_info.txt
+	[ -n "$incNY" ] && echo "$group" >> /tmp/all_group_info.txt || return 2
 	[ -n "$group" ] && return 0 || return 1
 }
 
@@ -896,7 +906,7 @@ update_trojan_config(){
 #vless://85dc5f20-111a-4274-3f0d-3ca40e000aff@test.aionas.tk:443?path=%2Fdyyjws&security=tls&encryption=none&host=test.aionas.tk&type=ws#test.aionas.tk_vless_ws
 
 get_vless_config(){
-	decode_link=$(urldecode $1 )	# 有些链接被 url 编码过，所以要先 url 解码
+	decode_link="$1"
 	if [ -z "$decode_link" ];then
 		echo_date "解析失败！！！"
 		return 1
@@ -906,7 +916,7 @@ get_vless_config(){
 
 
 	if [ -n "$(echo -n "$decode_link" | grep "#")" ];then
-		v2ray_ps=$(echo -n $decode_link | awk -F'#' '{print $2}' | sed 's/[\r\n ]//g' ) # 因为订阅的 vless 里面有 \r\n ，所以需要先去除，否则就炸了，只能卸载重装				
+		v2ray_ps=$(echo -n $decode_link | awk -F'#' '{print $2}' ) 				
 	else
 		v2ray_ps="$remarks" 
 	fi
@@ -926,8 +936,9 @@ get_vless_config(){
 	[ -n "$vless_group" ] && group_base64=`echo $vless_group | base64_encode | sed 's/ -//g'`
 	[ -n "$v2ray_add" ] && server_base64=`echo $v2ray_add | base64_encode | sed 's/ -//g'`	
 	[ -n "$v2ray_ps" ] && remarks_base64=`echo $v2ray_ps | base64_encode | sed 's/ -//g'`	
-	[ -n "$vless_group" ] && [ -n "$v2ray_add" ] && echo $server_base64 $group_base64 $remarks_base64>> /tmp/all_onlineservers
 
+	[ -n "$node_regexp" ] && incNY=`echo $v2ray_ps $v2ray_add  | sed -n "$node_regexp"` || incNY="Y"
+	[ -n "$incNY" ] && [ -n "$vless_group" ] && [ -n "$v2ray_add" ] && echo $server_base64 $group_base64 $remarks_base64 >> /tmp/all_onlineservers
 	#echo ------
 	#echo v2ray_ps: $v2ray_ps
 	#echo v2ray_add: $v2ray_add
@@ -941,7 +952,7 @@ get_vless_config(){
 	#echo v2ray_tlshost: $v2ray_tlshost
 	#echo v2ray_serviceName: $v2ray_serviceName
 	#echo ------
-	echo "$vless_group" >> /tmp/all_group_info.txt
+	[ -n "$incNY" ] && echo "$vless_group" >> /tmp/all_group_info.txt || return 2
 	[ -n "$vless_group" ] && return 0 || return 1
 	
 	[ -z "$v2ray_ps" -o -z "$v2ray_add" -o -z "$v2ray_port" -o -z "$v2ray_id"  -o -z "$v2ray_tls"  -o -z "$v2ray_net" ] && return 1 || return 0
@@ -1068,7 +1079,7 @@ update_vless_config(){
 # trojan go 节点添加解析并更新
 ##################################################################################################
 get_trojan_go_config(){
-	decode_link=$(urldecode $1)	# 有些链接被 url 编码过，所以要先 url 解码
+	decode_link="$1"
 	if [ -z "$decode_link" ];then
 		echo_date "解析失败！！！"
 		return 1
@@ -1077,7 +1088,7 @@ get_trojan_go_config(){
 	group="$2"
 
 	if [ -n "$(echo -n "$decode_link" | grep "#")" ];then
-		remarks=$(echo -n $decode_link | awk -F'#' '{print $2}' | sed 's/[\r\n ]//g' ) # 因为订阅的 trojan_go 里面有 \r\n ，所以需要先去除，否则就炸了，只能卸载重装				
+		remarks=$(echo -n $decode_link | awk -F'#' '{print $2}' ) 			
 	else
 		remarks="$remarks" 
 	fi
@@ -1107,8 +1118,11 @@ get_trojan_go_config(){
 	[ -n "$group" ] && group_base64=`echo $trojan_go_group | base64_encode | sed 's/ -//g'`
 	[ -n "$server" ] && server_base64=`echo $server | base64_encode | sed 's/ -//g'`	
 	[ -n "$remarks" ] && remarks_base64=`echo $remarks | base64_encode | sed 's/ -//g'`
+
+	[ -n "$node_regexp" ] && incNY=`echo $remarks $server  | sed -n "$node_regexp"` || incNY="Y"
+
 	#把全部服务器节点写入文件 /usr/share/shadowsocks/serverconfig/all_onlineservers
-	[ -n "$group" ] && [ -n "$server" ] && echo $server_base64 $group_base64 $remarks_base64 >> /tmp/all_onlineservers
+	[ -n "$incNY" ] && [ -n "$group" ] && [ -n "$server" ] && echo $server_base64 $group_base64 $remarks_base64 >> /tmp/all_onlineservers
 	
 	
 	#echo ------
@@ -1118,7 +1132,7 @@ get_trojan_go_config(){
 	#echo server_port: $server_port
 	#echo password: $password
 	#echo ------
-	echo "$group" >> /tmp/all_group_info.txt
+	[ -n "$incNY" ] && echo "$group" >> /tmp/all_group_info.txt || return 2
 	[ -n "$group" ] && return 0 || return 1
 	[ -z "$server" -o -z "$remarks" -o -z "$server_port" -o -z "$password" ] && return 1 || return 0
 }
@@ -1434,8 +1448,9 @@ get_type_name() {
 
 get_oneline_rule_now(){
 	# 节点订阅
-	ssr_subscribe_link="$1"
+	local ssr_subscribe_link=`echo "$1" | awk -F'~~' '{ print $1 }'`
 	LINK_FORMAT=`echo "$ssr_subscribe_link" | grep -E "^http://|^https://"`
+	local node_regexp=`echo "$1" | awk -F'~~' '{ print $2 }'`
 	[ -z "$LINK_FORMAT" ] && return 4
 	
 	echo_date "开始更新在线订阅列表..." 
@@ -1488,7 +1503,7 @@ get_oneline_rule_now(){
 	if [ "$?" == "0" ];then
 		echo_date 下载订阅成功...
 		echo_date 开始解析节点信息...
-		base64decode_link `cat /tmp/ssr_subscribe_file.txt` > /tmp/ssr_subscribe_file_temp1.txt
+		base64decode_link `cat /tmp/ssr_subscribe_file.txt` | urldecode | sed 's/[\r\n ]//g' > /tmp/ssr_subscribe_file_temp1.txt
 
 		maxnum=$(</tmp/ssr_subscribe_file_temp1.txt grep "MAX=" | awk -F"=" '{print $2}' | grep -Eo "[0-9]+")
 #		maxnum=5
@@ -1526,7 +1541,14 @@ get_oneline_rule_now(){
 
 				if [ -n "$NODE_FORMAT" ] && [ -n "$link" ]; then
 					get_${NODE_FORMAT}_config $link "$group"
-					[ "$?" == "0" ] && update_${NODE_FORMAT}_config || echo_date "检测到一个错误节点，已经跳过！"
+					local get_res=$? 
+					if [ "$get_res" == "0" ]; then 
+						update_${NODE_FORMAT}_config 
+					elif [ "$get_res" == "2" ]; then
+						echo_date "节点名称不满足自定义关键字或正则表达式，被排除。"
+					else
+						echo_date "检测到一个错误节点，已经跳过！"
+					fi
 				else
 					echo_date "解析失败！！！"
 				fi	
@@ -1781,7 +1803,7 @@ add() {
 
 			NODE_FORMAT=$(echo $ssrlink | awk -F":" '{print $1}' | sed 's/-/_/')
 			#echo $NODE_FORMAT
-			link=$(echo $ssrlink | cut -f3-  -d/)
+			link=$(echo $ssrlink | cut -f3-  -d/ | urldecode | sed 's/[\r\n ]//g')
 			#echo $link
 			if [ -n "$NODE_FORMAT" ] && [ -n "$link" ]; then
 				echo_date 检测到${NODE_FORMAT}链接...开始尝试解析...

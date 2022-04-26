@@ -1732,18 +1732,18 @@ function refresh_html() {
 		} else {
 			html = html + '<td style="width:40px"></td>';
 		}
-		html = html + '<td style="width:120px;text-align:left;" id="ss_node_name_' + c["node"] + '">' + c["name"] + '</td>';
+		html = html + '<td style="width:150px;text-align:left;" id="ss_node_name_' + c["node"] + '">' + c["name"] + '</td>';
 		html = html + '<td style="width:120px;text-align:left;" id="ss_node_server_' + c["node"] + '"> ' + c["server"] + '</td>';
 		html = html + '<td id="ss_node_port_' + c["node"] + '" style="width:37px;">' + c["port"] + '</td>';
 		if(!c["ping"]){
-			html = html + '<td id="ss_node_ping_' + c["node"] + '" style="width:90px;" class="ping" id="ping_test_td_' + c["node"] + '" style="text-align: center;">' + "不支持" + '</td>';
+			html = html + '<td id="ss_node_ping_' + c["node"] + '" style="width:69px;" class="ping" id="ping_test_td_' + c["node"] + '" style="text-align: center;">' + "不支持" + '</td>';
 		}else{
-			html = html + '<td id="ss_node_ping_' + c["node"] + '" style="width:90px;" class="ping" id="ping_test_td_' + c["node"] + '" style="text-align: center;">' + c["ping"] + '</td>';
+			html = html + '<td id="ss_node_ping_' + c["node"] + '" style="width:69px;" class="ping" id="ping_test_td_' + c["node"] + '" style="text-align: center;">' + c["ping"] + '</td>';
 		}
 		if (c["mode"] == 4 || c["use_kcp"] == 1) {
-			html = html + '<td id="ss_node_webtest_' + c["node"] + '" style="width:54px;color: #FFCC33" id="web_test_td_' + c["node"] + '">' + 'null' + '</td>';
+			html = html + '<td id="ss_node_webtest_' + c["node"] + '" style="width:45px;color: #FFCC33" id="web_test_td_' + c["node"] + '">' + 'null' + '</td>';
 		} else {
-			html = html + '<td id="ss_node_webtest_' + c["node"] + '" style="width:54px;" id="web_test_td_' + c["node"] + '">' + c["webtest"] + '</td>';
+			html = html + '<td id="ss_node_webtest_' + c["node"] + '" style="width:45px;" id="web_test_td_' + c["node"] + '">' + c["webtest"] + '</td>';
 		}
 		html = html + '<td style="width:33px;">'
 		html = html + '<input style="margin:-2px 0px -4px -2px;" id="dd_node_' + c["node"] + '" class="edit_btn" type="button" onclick="return edit_conf_table(this);" value="">'
@@ -4272,11 +4272,11 @@ function set_cron(action) {
 											<table style="margin:-1px 0px 0px 0px;table-layout:fixed;" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable1">
 												<tr height="40px">
 													<th style="width:40px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(16)">模式</a></th>
-													<th style="width:120px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(17)">节点名称</a></th>
+													<th style="width:150px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(17)">节点名称</a></th>
 													<th style="width:120px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(18)">服务器地址</a></th>
 													<th style="width:37px;">端口</th>
-													<th style="width:90px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(19)">ping/丢包</a></th>
-													<th style="width:54px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(20)">延迟</a></th>
+													<th style="width:69px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(19)">ping/丢包</a></th>
+													<th style="width:45px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(20)">延迟</a></th>
 													<th style="width:33px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(21)">编辑</a></th>
 													<th style="width:33px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(22)">删除</a></th>
 													<th style="width:65px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(23)">使用</a></th>
@@ -4288,11 +4288,11 @@ function set_cron(action) {
 												<table id="ss_node_list_table" style="margin:-1px 0px 0px 0px;" width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable1">
 													<tr id="hide_when_folw" height="40px" style="display: none;">
 														<th style="width:40px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(16)">模式</a></th>
-														<th style="width:120px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(17)">节点名称</a></th>
+														<th style="width:150px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(17)">节点名称</a></th>
 														<th style="width:120px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(18)">服务器地址</a></th>
 														<th style="width:37px;">端口</th>
-														<th style="width:90px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(19)">ping/丢包</a></th>
-														<th style="width:54px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(20)">延迟</a></th>
+														<th style="width:69px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(19)">ping/丢包</a></th>
+														<th style="width:45px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(20)">延迟</a></th>
 														<th style="width:33px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(21)">编辑</a></th>
 														<th style="width:33px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(22)">删除</a></th>
 														<th style="width:65px;"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(23)">使用</a></th>
