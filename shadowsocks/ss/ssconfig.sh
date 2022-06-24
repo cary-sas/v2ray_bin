@@ -1401,7 +1401,23 @@ create_v2ray_json(){
 			fi
 			;;
 		kcp)
+			if [ "$ss_basic_v2ray_network_path" == "" ]; then
 			local kcp="{
+				\"mtu\": 1350,
+				\"tti\": 50,
+				\"uplinkCapacity\": 12,
+				\"downlinkCapacity\": 100,
+				\"congestion\": false,
+				\"readBufferSize\": 2,
+				\"writeBufferSize\": 2,
+				\"header\": {
+				\"type\": \"$ss_basic_v2ray_headtype_kcp\",
+				\"request\": null,
+				\"response\": null
+				}
+				}"
+			else
+				local kcp="{
 				\"mtu\": 1350,
 				\"tti\": 50,
 				\"uplinkCapacity\": 12,
@@ -1415,8 +1431,10 @@ create_v2ray_json(){
 				\"request\": null,
 				\"response\": null
 				}
-				}"
+				}"			
+			fi
 			;;
+
 		ws)
 			local ws="{
 				\"connectionReuse\": true,
