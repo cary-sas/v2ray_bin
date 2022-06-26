@@ -1401,10 +1401,26 @@ create_v2ray_json(){
 			fi
 			;;
 		kcp)
+			if [ "$ss_basic_v2ray_network_path" == "" ]; then
 			local kcp="{
 				\"mtu\": 1350,
 				\"tti\": 50,
-				\"uplinkCapacity\": 12,
+				\"uplinkCapacity\": 100,
+				\"downlinkCapacity\": 100,
+				\"congestion\": false,
+				\"readBufferSize\": 2,
+				\"writeBufferSize\": 2,
+				\"header\": {
+				\"type\": \"$ss_basic_v2ray_headtype_kcp\",
+				\"request\": null,
+				\"response\": null
+				}
+				}"
+			else
+				local kcp="{
+				\"mtu\": 1350,
+				\"tti\": 50,
+				\"uplinkCapacity\": 100,
 				\"downlinkCapacity\": 100,
 				\"congestion\": false,
 				\"readBufferSize\": 2,
@@ -1415,8 +1431,8 @@ create_v2ray_json(){
 				\"request\": null,
 				\"response\": null
 				}
-				}"
-			[ -z "$ss_basic_v2ray_network_path" ] && local kcp=$(echo $kcp |sed 's/"seed": "*, //')
+				}"			
+			fi
 			;;
 		ws)
 			local ws="{
@@ -1897,7 +1913,8 @@ create_trojango_json(){
 start_v2ray() {
 	# v2ray start
 	cd /koolshare/bin
-	#export GOGC=30
+	export GOGC=20
+	echo_date "v2ray设置GO_GC为20状态"
 	v2ray -config=/koolshare/ss/v2ray.json >/dev/null 2>&1 &
 	local V2PID
 	local i=10
@@ -1910,6 +1927,7 @@ start_v2ray() {
 		fi
 		sleep 1
 	done
+	set_v2ray_alwaysrun_job
 	echo_date v2ray启动成功，pid：$V2PID
 }
 
@@ -1928,7 +1946,8 @@ start_v2ray_xray() {
 start_xray() {
 	# v2ray start
 	cd /koolshare/bin
-	#export GOGC=30
+	export GOGC=20
+	echo_date "xray设置GO_GC为20状态"
 	xray run -config=/koolshare/ss/v2ray.json >/dev/null 2>&1 &
 	local xrayPID
 	local i=10
@@ -1947,7 +1966,7 @@ start_xray() {
 start_trojan() {
 	# trojan start
 	cd /koolshare/bin
-	#export GOGC=30
+	export GOGC=15
 	xray run -config=/koolshare/ss/v2ray.json >/dev/null 2>&1 &
 	local trojanPID
 	local i=10
@@ -2459,6 +2478,17 @@ set_ss_trigger_job(){
 	fi
 }
 
+remove_v2ray_alwaysrun_job(){
+	echo_date 关闭V2ray进程守护工具...
+	sed -i '/v2_run_check/d' /var/spool/cron/crontabs/* >/dev/null 2>&1
+}
+
+set_v2ray_alwaysrun_job(){
+	echo_date 开启V2ray进程守护工具...
+	cru d v2_run_check  >/dev/null 2>&1
+	cru a v2_run_check "*/15 * * * * /koolshare/scripts/v2ray_autoreboot_job.sh"
+}
+
 load_nat(){
 	nat_ready=$(iptables -t nat -L PREROUTING -v -n --line-numbers|grep -v PREROUTING|grep -v destination)
 	i=120
@@ -2604,6 +2634,7 @@ disable_ss(){
 	dbus set dns2socks=0
 	dbus remove ss_basic_server_ip
 	nvram commit
+	remove_v2ray_alwaysrun_job
 	kill_process
 	remove_ss_trigger_job
 	remove_ss_reboot_job
