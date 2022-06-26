@@ -159,6 +159,7 @@ rm -rf /tmp/tmp_v2ray.json
 			fi
 			;;
 		kcp)
+		local local_path=$(eval echo \$ssconf_basic_v2ray_network_path_$nu)
 			local kcp="{
 				\"mtu\": 1350,
 				\"tti\": 50,
@@ -167,19 +168,21 @@ rm -rf /tmp/tmp_v2ray.json
 				\"congestion\": false,
 				\"readBufferSize\": 2,
 				\"writeBufferSize\": 2,
+				\"seed\": "$local_path",
 				\"header\": {
 				\"type\": \"$(eval echo \$ssconf_basic_v2ray_headtype_kcp_$nu)\",
 				\"request\": null,
 				\"response\": null
 				}
 				}"
+			[ -z "$local_path" ] && local kcp=$(echo $kcp |sed 's/"seed": "*, //')	
 			;;
 		ws)
 		local local_path=$(eval echo \$ssconf_basic_v2ray_network_path_$nu)
 		local local_header=$(eval echo \$ssconf_basic_v2ray_network_host_$nu)
 			local ws="{
 				\"connectionReuse\": true,
-				\"path\": $(get_path $local path),
+				\"path\": $(get_path $local_path),
 				\"headers\": $(get_ws_header local_header)
 				}"
 			;;

@@ -941,6 +941,7 @@ get_vless_config(){
 	v2ray_tls=$(echo "$decode_link" | tr '?&#' '\n' | grep 'security=' | awk -F'=' '{print $2}')	 # tls不会是关闭状态
 	v2ray_flow=$(echo "$decode_link" | tr '?&#' '\n' | grep 'flow=' | awk -F'=' '{print $2}')
 	v2ray_path=$(echo "$decode_link" | tr '?&#' '\n' | grep 'path=' | awk -F'=' '{print $2}')
+	v2ray_seed=$(echo "$decode_link" | tr '?&#' '\n' | grep 'seed=' | awk -F'=' '{print $2}')
 	v2ray_host=$(echo "$decode_link" | tr '?&#' '\n' | grep 'host=' | awk -F'=' '{print $2}')
 	v2ray_tlshost=$(echo "$decode_link" | tr '?&#' '\n' | grep 'sni=' | awk -F'=' '{print $2}')
 	v2ray_serviceName=$(echo "$decode_link" | tr '?&#' '\n' | grep 'serviceName=' | awk -F'=' '{print $2}')
@@ -1008,7 +1009,7 @@ add_vless_servers(){
 	kcp)
 		# kcp协议设置【 kcp伪装类型 (type)】
 		dbus set ssconf_basic_v2ray_headtype_kcp_$v2rayindex=$v2ray_type
-		[ -n "$v2ray_path" ] && dbus set ssconf_basic_v2ray_network_path_$v2rayindex=$v2ray_path
+		[ -n "$v2ray_seed" ] && dbus set ssconf_basic_v2ray_network_path_$v2rayindex=$v2ray_seed
 		;;
 	grpc)
 		# grpc协议设置【 grpc伪装类型 (type)】
@@ -1065,9 +1066,9 @@ update_vless_config(){
 		kcp)
 			# kcp协议
 			local_v2ray_type=$(dbus get ssconf_basic_v2ray_headtype_kcp_$index)
-			local_v2ray_path=$(dbus get ssconf_basic_v2ray_network_path_$index)
+			local_v2ray_seed=$(dbus get ssconf_basic_v2ray_network_path_$index)
 			[ "$local_v2ray_type" != "$v2ray_type" ] && dbus set ssconf_basic_v2ray_headtype_kcp_$index=$v2ray_type && let i+=1
-			[ "$local_v2ray_path" != "$v2ray_path" ] && dbus set ssconf_basic_v2ray_network_path_$index=$v2ray_path && let i+=1
+			[ "$local_v2ray_seed" != "$v2ray_seed" ] && dbus set ssconf_basic_v2ray_network_path_$index=$v2ray_seed && let i+=1
 			;;
 		grpc)
 			# grpc协议

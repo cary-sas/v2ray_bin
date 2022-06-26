@@ -1416,6 +1416,7 @@ create_v2ray_json(){
 				\"response\": null
 				}
 				}"
+			[ -z "$ss_basic_v2ray_network_path" ] && local kcp=$(echo $kcp |sed 's/"seed": "*, //')
 			;;
 		ws)
 			local ws="{
