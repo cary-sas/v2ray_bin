@@ -2044,14 +2044,14 @@ start_v2ray() {
 }
 
 start_v2ray_xray() {
-	if [ "$ss_basic_v2ray_xray" == "xray" ]; then
-		start_xray
+	if [ "$ss_basic_v2ray_xray" == "v2ray" ]; then
+		start_v2ray
 	elif [ "$ss_basic_type" == "4" ]; then
 		start_trojan
 	elif [ "$SS2022" == "Y" ]; then
 		start_ss2022		
 	else
-		start_v2ray
+		start_xray
 	fi
 }
 
