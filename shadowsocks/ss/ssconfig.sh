@@ -37,7 +37,7 @@ ARG_V2RAY_PLUGIN=""
 
 if [ "$ss_basic_type" == "0" ];then
 	case $ss_basic_method in
-		2022-blake3-aes-128-gcm|2022-blake3-aes-256-gcm|2022-blake3-chacha20-poly1305) SS2022="Y";;
+		2022-blake3-aes-128-gcm|2022-blake3-aes-256-gcm|2022-blake3-chacha20-poly1305|none) SS2022="Y";;
 		*)             SS2022="N";;
 	esac
 fi
