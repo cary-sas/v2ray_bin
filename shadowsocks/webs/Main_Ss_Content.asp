@@ -1838,6 +1838,7 @@ function refresh_table() {
 function refresh_html() {
 	browser_compatibility1();
 	confs = getAllConfigs();
+	var sorted_fields = get_sorted_fields(confs);
 	var n = 0;
 	for (var i in confs) {
 		n++;
@@ -1885,7 +1886,8 @@ function refresh_html() {
 		$("#ss_node_list_table_btn")[0].style.margin = '5px 0px 0px 0px';
 	}
 	var html = '';
-	for (var field in confs) {
+	for (var j = 0; j < sorted_fields.length; j++) {
+		var field = sorted_fields[j];
 		var c = confs[field];
 		html = html + '<tr style="height:40px">';
 		if (c["mode"] == 1) {
@@ -1977,7 +1979,106 @@ function refresh_html() {
 		html = html + '</td>';
 		html = html + '</tr>';
 	}
+	update_sort_buttons();
 	return html;
+}
+
+var result_sort_type = "";
+var result_sort_order = "asc";
+
+function parse_ping_for_sort(ping_text) {
+	if (!ping_text || ping_text.indexOf("failed") >= 0) {
+		return null;
+	}
+	var matched = ping_text.match(/([0-9]+\.?[0-9]*)\s*ms/);
+	if (!matched) {
+		return null;
+	}
+	return parseFloat(matched[1]);
+}
+
+function parse_webtest_for_sort(webtest_text) {
+	if (!webtest_text || webtest_text == "failed" || webtest_text == "null") {
+		return null;
+	}
+	var matched = webtest_text.match(/([0-9]+\.?[0-9]*)([KMB]?)/i);
+	if (!matched) {
+		return null;
+	}
+	var value = parseFloat(matched[1]);
+	if (isNaN(value)) {
+		return null;
+	}
+	var unit = matched[2].toUpperCase();
+	if (unit == "M") {
+		return value * 1024;
+	}
+	if (unit == "B") {
+		return value / 1024;
+	}
+	return value;
+}
+
+function get_sorted_fields(confs) {
+	var fields = Object.keys(confs).sort(function(a, b) {
+		return parseInt(a) - parseInt(b);
+	});
+	if (result_sort_type != "ping" && result_sort_type != "webtest") {
+		return fields;
+	}
+	fields.sort(function(a, b) {
+		var av = result_sort_type == "ping" ? parse_ping_for_sort(confs[a].ping) : parse_webtest_for_sort(confs[a].webtest);
+		var bv = result_sort_type == "ping" ? parse_ping_for_sort(confs[b].ping) : parse_webtest_for_sort(confs[b].webtest);
+		var a_invalid = (av === null);
+		var b_invalid = (bv === null);
+		if (a_invalid && b_invalid) {
+			return parseInt(a) - parseInt(b);
+		}
+		if (a_invalid) {
+			return 1;
+		}
+		if (b_invalid) {
+			return -1;
+		}
+		if (av == bv) {
+			return parseInt(a) - parseInt(b);
+		}
+		if (result_sort_order == "asc") {
+			return av - bv;
+		}
+		return bv - av;
+	});
+	return fields;
+}
+
+function toggle_result_sort(sort_type) {
+	if (result_sort_type == sort_type) {
+		result_sort_order = result_sort_order == "asc" ? "desc" : "asc";
+	} else {
+		result_sort_type = sort_type;
+		result_sort_order = "asc";
+	}
+	update_sort_buttons();
+	refresh_table();
+}
+
+function update_sort_buttons() {
+	var ping_btn = E("ping_sort_btn");
+	var web_btn = E("web_sort_btn");
+	if (ping_btn) {
+		if (result_sort_type == "ping") {
+			ping_btn.value = "ping" + (result_sort_order == "asc" ? "升序" : "降序");
+		} else {
+			ping_btn.value = "ping升序";
+		}
+	}
+	if (web_btn) {
+		if (result_sort_type == "webtest") {
+			web_btn.value = "web" + (result_sort_order == "asc" ? "升序" : "降序");
+		} else {
+			web_btn.value = "web升序";
+		}
+	}
 }
 var node_nu;
 
@@ -4624,6 +4725,7 @@ function set_cron(action) {
 														<select id="ssconf_basic_ping_node" name="ssconf_basic_ping_node" style="width:124px;margin:0px 0px 0px 2px;" class="input_option" onchange="update_ping_method();"></select>
 														<select id="ssconf_basic_ping_method" name="ssconf_basic_ping_method" style="width:160px;margin:0px 0px 0px 2px;" class="input_option"></select>
 														<input class="ss_btn" style="cursor:pointer;" onClick="remove_ping()" type="button" value="清空结果"/>
+													<input id="ping_sort_btn" class="ss_btn" style="cursor:pointer;" onClick="toggle_result_sort('ping')" type="button" value="ping升序"/>
 													</td>
 												</tr>
 												<tr>
@@ -4638,6 +4740,7 @@ function set_cron(action) {
 															<option class="content_input_fd" value="http://cachefly.cachefly.net/">v2rayN</option>
 														</select>
 														<input class="ss_btn" style="cursor:pointer;" onClick="remove_test()" type="button" value="清空结果"/>
+													<input id="web_sort_btn" class="ss_btn" style="cursor:pointer;" onClick="toggle_result_sort('webtest')" type="button" value="web升序"/>
 													</td>
 												</tr>
 											</table>
