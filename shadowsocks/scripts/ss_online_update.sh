@@ -182,6 +182,7 @@ prepare(){
 		[ -n "$(dbus get ssconf_basic_naive_user_$nu)" ] && echo dbus set ssconf_basic_naive_user_$q=$(dbus get ssconf_basic_naive_user_$nu)  >> /tmp/ss_conf.sh
 		[ -n "$(dbus get ssconf_basic_xray_publicKey_$nu)" ] && echo dbus set ssconf_basic_xray_publicKey_$q=$(dbus get ssconf_basic_xray_publicKey_$nu)  >> /tmp/ss_conf.sh
 		[ -n "$(dbus get ssconf_basic_xray_shortId_$nu)" ] && echo dbus set ssconf_basic_xray_shortId_$q=$(dbus get ssconf_basic_xray_shortId_$nu)  >> /tmp/ss_conf.sh
+		[ -n "$(dbus get ssconf_basic_ech_$nu)" ] && echo dbus set ssconf_basic_ech_$q=$(dbus get ssconf_basic_ech_$nu)  >> /tmp/ss_conf.sh
 
 		echo "#------------------------" >> /tmp/ss_conf.sh
 		if [ "$nu" == "$ssconf_basic_node" ];then
@@ -996,6 +997,7 @@ get_vless_config(){
 	fingerprint=$(echo "$decode_link" | tr '?&#' '\n' | grep 'fp=' | awk -F'=' '{print $2}')
 	xray_publicKey=$(echo "$decode_link" | tr '?&#' '\n' | grep 'pbk=' | awk -F'=' '{print $2}')
 	xray_shortId=$(echo "$decode_link" | tr '?&#' '\n' | grep 'sid=' | awk -F'=' '{print $2}')
+	ech=$(echo "$decode_link" | tr '?&#' '\n' | grep '^ech=' | awk -F'=' '{print $2}')
 	#把全部服务器节点编码后写入文件 /usr/share/shadowsocks/serverconfig/all_onlineservers
 	[ -n "$vless_group" ] && group_base64=`echo $vless_group | base64_encode | sed 's/ -//g'`
 	[ -n "$v2ray_add" ] && server_base64=`echo $v2ray_add | base64_encode | sed 's/ -//g'`	
@@ -1049,6 +1051,7 @@ add_vless_servers(){
 	dbus set ssconf_basic_v2ray_network_$v2rayindex=$v2ray_net
 	[ -n "$fingerprint" ] && dbus set ssconf_basic_fingerprint_$v2rayindex=$fingerprint
 	[ -n "$v2ray_tlshost" ] && dbus set ssconf_basic_v2ray_network_tlshost_$v2rayindex=$v2ray_tlshost
+	[ -n "$ech" ] && dbus set ssconf_basic_ech_$v2rayindex=$ech
 	
 	case $v2ray_net in
 	tcp)
@@ -1115,6 +1118,7 @@ update_vless_config(){
 		dbus_update_if_diff "ssconf_basic_v2ray_network_$index" "$v2ray_net" && i=$((i+1))
 		dbus_update_if_diff "ssconf_basic_v2ray_network_tlshost_$index" "$v2ray_tlshost" && i=$((i+1))
 		dbus_update_if_diff "ssconf_basic_fingerprint_$index" "$fingerprint" && i=$((i+1))
+		dbus_update_if_diff "ssconf_basic_ech_$index" "$ech" && i=$((i+1))
 
 
 		case "$v2ray_net" in
@@ -1343,6 +1347,7 @@ del_none_exist(){
 					dbus remove ssconf_basic_naive_user_$localindex
 					dbus remove ssconf_basic_xray_publicKey_$localindex
 					dbus remove ssconf_basic_xray_shortId_$localindex
+					dbus remove ssconf_basic_ech_$localindex
 				let delnum+=1
 			fi 
 			done
@@ -1438,6 +1443,7 @@ remove_node_gap(){
 				[ -n "$(dbus get ssconf_basic_naive_user_$nu)" ] && dbus set ssconf_basic_naive_user_"$y"="$(dbus get ssconf_basic_naive_user_$nu)" && dbus remove ssconf_basic_naive_user_$nu
 				[ -n "$(dbus get ssconf_basic_xray_publicKey_$nu)" ] && dbus set ssconf_basic_xray_publicKey_"$y"="$(dbus get ssconf_basic_xray_publicKey_$nu)" && dbus remove ssconf_basic_xray_publicKey_$nu
 				[ -n "$(dbus get ssconf_basic_xray_shortId_$nu)" ] && dbus set ssconf_basic_xray_shortId_"$y"="$(dbus get ssconf_basic_xray_shortId_$nu)" && dbus remove ssconf_basic_xray_shortId_$nu
+				[ -n "$(dbus get ssconf_basic_ech_$nu)" ] && dbus set ssconf_basic_ech_"$y"="$(dbus get ssconf_basic_ech_$nu)" && dbus remove ssconf_basic_ech_$nu
 
 				usleep 100000
 				# change node nu
@@ -1783,6 +1789,7 @@ start_update(){
 						dbus remove ssconf_basic_naive_user_$conf_nu
 						dbus remove ssconf_basic_xray_publicKey_$conf_nu
 						dbus remove ssconf_basic_xray_shortId_$conf_nu
+						dbus remove ssconf_basic_ech_$conf_nu
 					done
 					# 删除不再订阅节点的group信息
 					confs_nu_2=`dbus list ss_online_group_|grep "$local_group"| cut -d "=" -f 1|cut -d "_" -f 4`
@@ -1946,6 +1953,7 @@ remove_online(){
 		dbus remove ssconf_basic_naive_user_$remove_nu
 		dbus remove ssconf_basic_xray_publicKey_$remove_nu
 		dbus remove ssconf_basic_xray_shortId_$remove_nu
+		dbus remove ssconf_basic_ech_$remove_nu
 	done
 }
 

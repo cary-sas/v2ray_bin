@@ -1287,6 +1287,14 @@ get_fingerprint(){
 	fi
 }
 
+get_ech_config(){
+	if [ -n "$1" ];then
+		echo [\"$1\"]
+	else
+		echo "null"
+	fi
+}
+
 resolve_node_ip4json(){	
 	
 	# 检测用户json的服务器ip地址
@@ -1431,7 +1439,8 @@ create_v2ray_json(){
 			local tls="{
 					\"allowInsecure\": $(get_function_switch $ss_basic_allowinsecure),
 					\"fingerprint\": $(get_fingerprint $ss_basic_fingerprint),
-					\"serverName\": \"$ss_basic_v2ray_network_tlshost\"
+					\"serverName\": \"$ss_basic_v2ray_network_tlshost\",
+					\"echConfigList\": $(get_ech_config $ss_basic_ech)
 					}"
 			[ "$ss_basic_v2ray_network_flow" != "none" -a "$ss_basic_v2ray_network_flow" != "" ] && local vless_flow="\"flow\": \"$ss_basic_v2ray_network_flow\","	|| 	local vless_flow=""
 			;;
