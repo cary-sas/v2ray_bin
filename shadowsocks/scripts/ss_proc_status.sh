@@ -134,6 +134,17 @@ echo_version(){
 		fi
 	fi
 
+	##---------------------------anytls-----------------------
+	if [ -z "$ss_basic_anytls_version" ];then
+		ss_basic_anytls_version_tmp=`/koolshare/bin/anytls -version 2>/dev/null | head -n 1 | cut -d " " -f2`
+		if [ -n "$ss_basic_anytls_version_tmp" ];then
+			ss_basic_anytls_version="$ss_basic_anytls_version_tmp"
+			dbus set ss_basic_anytls_version="$ss_basic_anytls_version_tmp"
+		else
+			ss_basic_anytls_version="null"
+		fi
+	fi
+
 	echo ① 程序版本（插件版本：$SOFVERSION）：
 	echo -----------------------------------------------------------
 	echo "程序			版本		备注"
@@ -155,6 +166,7 @@ echo_version(){
 	echo "trojan-go		$ss_basic_trojango_version		2022年12月29日编译"
 	echo "naive		$ss_basic_naive_version	"
 	echo "hysteria		$ss_basic_hysteria_version	"
+	echo "anytls		$ss_basic_anytls_version	"
 	echo -----------------------------------------------------------
 }
 
@@ -181,6 +193,7 @@ check_status(){
 	TROJANGO=`pidof trojan-go`
 	NAIVE=`pidof naive`
 	HYSTERIA=`pidof hysteria`
+	ANYTLS=`pidof anytls`
 	HDP=`pidof https_dns_proxy`
 	DMQ=`pidof dnsmasq`
 	SMD=$(pidof smartdns)
@@ -226,6 +239,7 @@ check_status(){
 		[ -n "$XRAY" ] && echo "xray		工作中	pid：$XRAY" || echo "xray	未运行"	
 		[ -n "$TROJANGO" ] && echo "trojan-go		工作中	pid：$TROJANGO" || echo "trojan-go	未运行"	
 		[ -n "$HYSTERIA" ] && echo "Hysteria2		工作中	pid：$HYSTERIA" || echo "Hysteria2	未运行"	
+		[ -n "$ANYTLS" ] && echo "AnyTLS		工作中	pid：$ANYTLS" || echo "AnyTLS	未运行"
 	elif [ "$ss_basic_type" == "5" ];then
 		echo_version
 		echo

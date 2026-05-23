@@ -463,11 +463,14 @@ function openssHint(itemNum) {
 		statusmenu = "优先建议使用ip地址"
 		_caption = "服务器地址";
 	} else if (itemNum == 19) {
-		statusmenu = "&nbsp;&nbsp;&nbsp;&nbsp;ping/丢包功能用于检测你的路由器到ss服务器的ping值和丢包；"
-		statusmenu += "</br>&nbsp;&nbsp;&nbsp;&nbsp;比如一些游戏线路对ping值和丢包有要求，可以选择ping值较低，丢包较少的节点；"
-		statusmenu += "</br>&nbsp;&nbsp;&nbsp;&nbsp;一些奇葩的运营商可能会禁ping，一些SS服务器也会禁止ping，此处检测就会failed，所以遇到这种情况不必惊恐。"
-		_caption = "ping/丢包";
-	} else if (itemNum == 21) {
+		statusmenu = "&nbsp;&nbsp;&nbsp;&nbsp;延迟等级说明：";
+		statusmenu += "</br>&nbsp;&nbsp;&nbsp;&nbsp;S：≤ 80 ms";
+		statusmenu += "</br>&nbsp;&nbsp;&nbsp;&nbsp;A：81-150 ms";
+		statusmenu += "</br>&nbsp;&nbsp;&nbsp;&nbsp;B：151-250 ms";
+		statusmenu += "</br>&nbsp;&nbsp;&nbsp;&nbsp;C：251-400 ms";
+		statusmenu += "</br>&nbsp;&nbsp;&nbsp;&nbsp;D：> 400 ms";
+    	_caption = "延迟[评分]";
+	}else if (itemNum == 21) {
 		statusmenu = "&nbsp;&nbsp;&nbsp;&nbsp;编辑节点功能能帮助你快速的更改ss某个节点的设置，比如服务商更换IP地址之后，可以快速更改；"
 		statusmenu += "</br>&nbsp;&nbsp;&nbsp;&nbsp;编辑节点目前只支持相同类型节点的编辑，比如不能将ss节点编辑为ssr节点，如果你的ssr节点是兼容原版协议的，建议你在主面板用使用ssr勾选框来进行更改。"
 		_caption = "编辑节点";

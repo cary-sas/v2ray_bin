@@ -7,7 +7,7 @@ source /koolshare/scripts/base.sh
 alias echo_date='echo 【$(TZ=UTC-8 date -R +%Y年%m月%d日\ %X)】:'
 
 echo_date 开始清理shadowsocks配置...
-confs=`dbus list ss | cut -d "=" -f 1 | sed '/_webtest_\|ssid_\|ssserver_\|_ping_\|ss_node_table\|_state_/d'`
+confs=`dbus list ss | cut -d "=" -f 1 | sed '/_webtest_\|ssid_\|ssserver_\|ss_node_table\|_state_/d'`
 for conf in $confs
 do
 	echo_date 移除$conf

@@ -16,7 +16,7 @@ if [ -n "$socksopen_b" ] && [ "$ss_basic_online_links_goss" == "1" ];then
 	alias curlxx='curl --connect-timeout 8 -k --socks5-hostname 127.0.0.1:23456 '
 else
 	echo_date "使用常规网络下载..."
-	alias curlxx='curl --connect-timeout 8 -k 380_armv5/simple-obfs/curl'
+	alias curlxx='curl --connect-timeout 8 -k '
 fi
 
 install_ss(){

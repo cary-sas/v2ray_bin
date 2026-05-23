@@ -6,12 +6,12 @@ fixed many historical legacy issues
 
 除插件原有功能外，另外
 
-* 支持 xray, vless, xtls vision, reality, trojan, trojan-go, NaiveProxy, Hysteria2 等协议及更新，
+* 支持 xray, vless, xtls vision, reality, trojan, trojan-go, NaiveProxy, Hysteria2, AnyTLS 等协议及更新，
 * 支持 ss2022，
 * 支持多个 xray 节点聚合，负载平衡，
 * 支持混合节点订阅，
 * 支持同时订阅多个链接，回车隔开，
-* 支持ss:// vless:// trojan:// trojan-go:// hysteria2:// 格式订阅和导入，
+* 支持ss:// vless:// trojan:// trojan-go:// hysteria2:// anytls:// 格式订阅和导入，
 * 支持smartDNS (不熟悉配置请勿选择)，ChinaDNS-NG
 * 支持在线更新
 

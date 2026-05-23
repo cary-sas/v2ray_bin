@@ -196,6 +196,13 @@ kill_process(){
 		kill -9 "$hy2_process" >/dev/null 2>&1
 	fi
 
+	anytls_process=`pidof anytls`
+	if [ -n "$anytls_process" ];then
+		echo_date 关闭AnyTLS进程...
+		killall anytls >/dev/null 2>&1
+		kill -9 "$anytls_process" >/dev/null 2>&1
+	fi
+
 	rssredir=`pidof rss-redir`
 	if [ -n "$rssredir" ];then 
 		echo_date 关闭ssr-redir进程...
@@ -2257,6 +2264,29 @@ start_hy2() {
 	echo_date Hysteria2启动成功，pid：$hy2PID
 }
 
+start_anytls(){
+	# AnyTLS start
+	cd /koolshare/bin
+	if [ -n "$ss_basic_trojan_sni" ]; then
+		anytls -socks 127.0.0.1:23456 -nat 0.0.0.0:3333 -s "$(dbus get ss_basic_server):$ss_basic_port" -p "$ss_basic_password" -sni "$ss_basic_trojan_sni" >/dev/null 2>&1 &
+	else
+		anytls -socks 127.0.0.1:23456 -nat 0.0.0.0:3333 -s "$(dbus get ss_basic_server):$ss_basic_port" -p "$ss_basic_password" >/dev/null 2>&1 &
+	fi
+	local anytlsPID=$!
+	local i=10
+	until [ -n "$anytlsPID" ] && kill -0 "$anytlsPID" >/dev/null 2>&1; do
+		anytlsPID=$(pidof anytls)
+		[ -n "$anytlsPID" ] && break
+		i=$(($i - 1))
+		if [ "$i" -lt 1 ]; then
+			echo_date "AnyTLS进程启动失败！"
+			close_in_five
+		fi
+		sleep 1
+	done
+	echo_date AnyTLS启动成功，pid：$anytlsPID
+}
+
 start_ss2022() {
 	# Shadowsocks 2022  start
 	cd /koolshare/bin
@@ -2988,6 +3018,7 @@ apply_ss(){
 	[ "$ss_basic_type" == "4" -a "$ss_basic_trojan_binary" == "Trojan-Go" ] && start_trojango
 	[ "$ss_basic_type" == "5" ] && start_naiveproxy
 	[ "$ss_basic_type" == "4" -a "$ss_basic_trojan_binary" == "Hysteria2" ] && start_hy2
+	[ "$ss_basic_type" == "4" -a "$ss_basic_trojan_binary" == "AnyTLS" ] && start_anytls
 	[ "$ss_basic_type" != "2" ] && start_kcp
 	[ "$ss_basic_type" != "2" ] && start_dns
 	#===load nat start===

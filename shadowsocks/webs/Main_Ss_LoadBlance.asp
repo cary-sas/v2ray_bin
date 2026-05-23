@@ -108,15 +108,6 @@ function getAllConfigs() {
 		} else {
 			obj["name"] = db_ss[p + "_name_" + field];
 		}
-		//ping显示
-		if (typeof db_ss[p + "_ping_" + field] == "undefined") {
-			obj["ping"] = '';
-		} else if (db_ss[p + "_ping_" + field] == "failed") {
-			obj["ping"] = '<font color="#FFCC00">failed</font>';
-		} else {
-			obj["ping"] = parseFloat(db_ss[p + "_ping_" + field].split(" ")[0]).toPrecision(3) + " ms / " + parseFloat(db_ss[p + "_ping_" + field].split(" ")[3]) + "%";
-		}
-
 		if (typeof db_ss[p + "_webtest_" + field] == "undefined") {
 			obj["webtest"] = '';
 		} else {
@@ -658,6 +649,5 @@ function count_down_close() {
 <div id="footer"></div>
 </body>
 </html>
-
 
 

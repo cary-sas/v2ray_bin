@@ -15,7 +15,6 @@ DEL_SUBSCRIBE=0
 SOCKS_FLAG=0
 
 # ==============================
-# ssconf_basic_ping_
 # ssconf_basic_webtest_
 # ssconf_basic_node_
 # ssconf_basic_koolgame_udp_
@@ -956,6 +955,99 @@ update_hysteria2_config(){
 }
 
 ##################################################################################################
+# AnyTLS 节点添加解析并更新
+##################################################################################################
+get_anytls_config(){
+	decode_link="$1"
+	if [ -z "$decode_link" ];then
+		echo_date "解析失败！！！"
+		return 1
+	fi
+
+	group="$2"
+
+	if [ -n "$(echo -n "$decode_link" | grep "#")" ];then
+		remarks=$(echo -n $decode_link | awk -F'#' '{print $2}')
+		decode_link=$(echo -n $decode_link | awk -F'#' '{print $1}')
+	else
+		remarks="$remarks"
+	fi
+
+	link_body=$(echo "$decode_link" | awk -F'[?#]' '{print $1}')
+	password=$(echo "$link_body" |awk -F'@' '{print $1}')
+	server_part=$(echo "$link_body" |awk -F'@' '{print $2}')
+	server=$(echo "$server_part" |awk -F':' '{print $1}' | awk -F'/' '{print $1}')
+	server_port=$(echo "$server_part" |awk -F':' '{print $2}' | awk -F'/' '{print $1}')
+	[ -z "$server_port" ] && server_port=443
+	password=`echo $password|base64_encode`
+	sni=$(echo "$decode_link" | tr '?#&' '\n' | grep '^sni=' | awk -F'=' '{print $2}')
+	anytls_insecure=$(echo "$decode_link" | tr '?#&' '\n' | grep '^insecure=' | awk -F'=' '{print $2}' | tr 'A-Z' 'a-z')
+	insecure=0
+	[ "$anytls_insecure" = "1" -o "$anytls_insecure" = "true" ] && insecure=1
+	v2ray_net=0
+	binary="AnyTLS"
+
+	[ -n "$group" ] && group_base64=`echo $group | base64_encode | sed 's/ -//g'`
+	[ -n "$server" ] && server_base64=`echo $server | base64_encode | sed 's/ -//g'`
+	[ -n "$remarks" ] && remarks_base64=`echo $remarks | base64_encode | sed 's/ -//g'`
+
+	[ -n "$node_regexp" ] && incNY=`echo $remarks $server  | sed -n "$node_regexp"` || incNY="Y"
+
+	[ -n "$incNY" ] && [ -n "$group" ] && [ -n "$server" ] && echo $server_base64 $group_base64 $remarks_base64 >> /tmp/all_onlineservers
+	[ -n "$incNY" ] && echo "$group" >> /tmp/all_group_info.txt || return 2
+	[ -n "$group" ] && return 0 || return 1
+}
+
+add_anytls_servers(){
+	[[ $1 -ge 1000 ]] &&  local group_index=$1
+	anytlsindex_x=$(($(dbus list ssconf_basic_|grep _name_ |awk -v group_index=$((group_index+1000)) -F'[_=]' '{if($4<group_index)print$4}' |sort -rn|head -n1)+1))
+	[[ $anytlsindex_x -gt 1000 ]] && anytlsindex_x=$((anytlsindex_x%1000))
+	anytlsindex=$((anytlsindex_x+group_index))
+	[[ $1 -ge 1000 ]] && dbus set ssconf_basic_group_$anytlsindex=$group
+	dbus set ssconf_basic_name_$anytlsindex=$remarks
+	dbus set ssconf_basic_mode_$anytlsindex=$ssr_subscribe_mode
+	dbus set ssconf_basic_server_$anytlsindex=$server
+	dbus set ssconf_basic_port_$anytlsindex=$server_port
+	dbus set ssconf_basic_password_$anytlsindex=$password
+	dbus set ssconf_basic_type_$anytlsindex="4"
+	dbus set ssconf_basic_trojan_binary_$anytlsindex=$binary
+	dbus set ssconf_basic_trojan_sni_$anytlsindex=$sni
+	dbus set ssconf_basic_trojan_network_$anytlsindex=$v2ray_net
+	dbus set ssconf_basic_allowinsecure_$anytlsindex=$insecure
+
+	echo_date "AnyTLS 节点：新增加 【$remarks】 到节点列表第 $anytlsindex_x 位。"
+}
+
+update_anytls_config(){
+	isadded_server=$(</tmp/all_localservers grep -w "$group_base64" | awk '{print $1 , $4}' | grep -c "${server_base64} ${remarks_base64}" | head -n1)
+	if [ "$isadded_server" == "0" ]; then
+		add_anytls_servers "$1"
+		let addnum8+=1
+		let addnum+=1
+	else
+		local index=$(</tmp/all_localservers grep "$group_base64" | awk '{print $1 , $4, $3}' | grep "${server_base64} ${remarks_base64}" | awk '{print $3}' | head -n1)
+
+		local i=0
+		dbus set "ssconf_basic_mode_$index=$ssr_subscribe_mode"
+
+		dbus_update_if_diff "ssconf_basic_name_$index" "$remarks" && i=$((i+1))
+		dbus_update_if_diff "ssconf_basic_server_$index" "$server" && i=$((i+1))
+		dbus_update_if_diff "ssconf_basic_port_$index" "$server_port" && i=$((i+1))
+		dbus_update_if_diff "ssconf_basic_password_$index" "$password" && i=$((i+1))
+		dbus_update_if_diff "ssconf_basic_trojan_binary_$index" "$binary" && i=$((i+1))
+		dbus_update_if_diff "ssconf_basic_trojan_network_$index" "$v2ray_net" && i=$((i+1))
+		dbus_update_if_diff "ssconf_basic_trojan_sni_$index" "$sni" && i=$((i+1))
+		dbus_update_if_diff "ssconf_basic_allowinsecure_$index" "$insecure" && i=$((i+1))
+
+		if [ "$i" -gt "0" ]; then
+		echo_date "修改 AnyTLS 节点：【$remarks】" && let updatenum8+=1 && let updatenum+=1
+		else
+		echo_date "AnyTLS 节点：【$remarks】 参数未发生变化，跳过！"
+		fi
+	fi
+}
+
+##################################################################################################
 # vless 节点添加解析并更新
 ##################################################################################################
 
@@ -1280,6 +1372,8 @@ del_none_exist(){
 					let delnum6+=1
 				elif [ "`dbus get ssconf_basic_type_$localindex`" = "4" ] && [ "`dbus get ssconf_basic_trojan_binary_$localindex`" = "Hysteria2" ];then	 #Hysteria2
 					let delnum7+=1	
+				elif [ "`dbus get ssconf_basic_type_$localindex`" = "4" ] && [ "`dbus get ssconf_basic_trojan_binary_$localindex`" = "AnyTLS" ];then	 #AnyTLS
+					let delnum8+=1
 				fi
 				
 					dbus remove ssconf_basic_group_$localindex
@@ -1499,17 +1593,17 @@ get_oneline_rule_now(){
 	
 	if [ "$ss_basic_online_links_goss" == "1" ];then
 		open_socks_23456
-		socksopen_b=`netstat -nlp|grep -w 23456|grep -E "local|xray|trojan-go|naive|hysteria"`
+		socksopen_b=`netstat -nlp|grep -w 23456|grep -E "local|xray|trojan-go|naive|hysteria|anytls"`
 		if [ -n "$socksopen_b" ];then
 			echo_date "使用$(get_type_name $ss_basic_type)提供的socks代理网络下载..."
-			curl -k --connect-timeout 8 -s -L --socks5-hostname 127.0.0.1:23456 $ssr_subscribe_link > /tmp/ssr_subscribe_file.txt
+			curl -k --connect-timeout 8 -s -A "v2rayN" -L --socks5-hostname 127.0.0.1:23456 $ssr_subscribe_link > /tmp/ssr_subscribe_file.txt
 		else
 			echo_date "没有可用的socks5代理端口，改用常规网络下载..."
-			curl -k --connect-timeout 8 -s -L $ssr_subscribe_link > /tmp/ssr_subscribe_file.txt
+			curl -k --connect-timeout 8 -s -A "v2rayN" -L $ssr_subscribe_link > /tmp/ssr_subscribe_file.txt
 		fi
 	else
 		echo_date "使用常规网络下载..."
-		curl -k --connect-timeout 8 -s -L $ssr_subscribe_link > /tmp/ssr_subscribe_file.txt
+		curl -k --connect-timeout 8 -s -A "v2rayN" -L $ssr_subscribe_link > /tmp/ssr_subscribe_file.txt
 	fi
 
 	#虽然为0但是还是要检测下是否下载到正确的内容
@@ -1552,7 +1646,7 @@ get_oneline_rule_now(){
 		fi
 
 
-		NODE_NU_online=$(</tmp/ssr_subscribe_file_temp1.txt grep -cE '^ss://|^ssr://|^vmess://|^trojan://|^vless://|^trojan-go://|^hysteria2://')
+		NODE_NU_online=$(</tmp/ssr_subscribe_file_temp1.txt grep -cE '^ss://|^ssr://|^vmess://|^trojan://|^vless://|^trojan-go://|^hysteria2://|^hy2://|^anytls://')
 		echo_date "检测到ShadowSocks节点格式，共计${NODE_NU_online}个节点..."
 
 		if [  "$NODE_NU_online" = "0" ] ; then
@@ -1568,16 +1662,17 @@ get_oneline_rule_now(){
 			remarks='AutoSuB'
 			group_index=$((url_count*1000))
 			# 提取节点
-			grep -E '^ss://|^ssr://|^vmess://|^trojan://|^vless://|^trojan-go://|^hysteria2://' /tmp/ssr_subscribe_file_temp1.txt >  /tmp/ssr_subscribe_file_temp2.txt &&  mv  /tmp/ssr_subscribe_file_temp2.txt  /tmp/ssr_subscribe_file_temp1.txt
-			
-			# 检测ss ssr vmess trojan vless trojan-go hysteria2 
+			grep -E '^ss://|^ssr://|^vmess://|^trojan://|^vless://|^trojan-go://|^hysteria2://|^hy2://|^anytls://' /tmp/ssr_subscribe_file_temp1.txt >  /tmp/ssr_subscribe_file_temp2.txt &&  mv  /tmp/ssr_subscribe_file_temp2.txt  /tmp/ssr_subscribe_file_temp1.txt
+
+			# 检测ss ssr vmess trojan vless trojan-go hysteria2 anytls
 			while read -r line
 			do 
 				link=""
 				decode_link=""
 
 				NODE_FORMAT="${line%%://*}"
-				NODE_FORMAT="${NODE_FORMAT//-/_}"     
+				NODE_FORMAT="${NODE_FORMAT//-/_}"
+				[ "$NODE_FORMAT" = "hy2" ] && NODE_FORMAT="hysteria2"
 				link="${line#*://}"                  
 
 				if [ -n "$NODE_FORMAT" ] && [ -n "$link" ]; then
@@ -1623,6 +1718,9 @@ get_oneline_rule_now(){
 			 if [ "${addnum7}${updatenum7}${delnum7}" != "000" ];then 
 			 echo_date " 新增Hysteria2节点 $addnum7 个，修改 $updatenum7 个，删除 $delnum7 个；"
 			 fi
+			 if [ "${addnum8}${updatenum8}${delnum8}" != "000" ];then
+			 echo_date " 新增AnyTLS节点 $addnum8 个，修改 $updatenum8 个，删除 $delnum8 个；"
+			 fi
 			echo_date "现共有手动添加的ShadowSocks节点：$USER_ADD 个；"
 			echo_date "现共有来自订阅的ShadowSocks节点：$ONLINE_GET 个；"
 			echo_date "在线订阅列表更新完成!"	
@@ -1666,9 +1764,9 @@ start_update(){
 		echo_date "				服务器订阅程序(Shell by stones & sadog)"
 		echo_date "==================================================================="
 		echo_date "从 $url 获取订阅..."
-		addnum=0 ; addnum1=0 ; addnum2=0 ; addnum3=0 ; addnum4=0 ; addnum5=0; addnum6=0; addnum7=0 
-		updatenum=0 ; updatenum1=0 ; updatenum2=0 ; updatenum3=0 ; updatenum4=0 ; updatenum5=0; updatenum6=0; updatenum7=0
-		delnum=0 ; delnum1=0 ; delnum2=0 ; delnum3=0 ; delnum4=0 ; delnum5=0; delnum6=0; delnum7=0
+		addnum=0 ; addnum1=0 ; addnum2=0 ; addnum3=0 ; addnum4=0 ; addnum5=0; addnum6=0; addnum7=0; addnum8=0
+		updatenum=0 ; updatenum1=0 ; updatenum2=0 ; updatenum3=0 ; updatenum4=0 ; updatenum5=0; updatenum6=0; updatenum7=0; updatenum8=0
+		delnum=0 ; delnum1=0 ; delnum2=0 ; delnum3=0 ; delnum4=0 ; delnum5=0; delnum6=0; delnum7=0; delnum8=0
 		
 		get_oneline_rule_now "$url"
 
@@ -1848,6 +1946,7 @@ add() {
 			decode_link=""
 
 			NODE_FORMAT=$(echo $ssrlink | awk -F":" '{print $1}' | sed 's/-/_/')
+			[ "$NODE_FORMAT" = "hy2" ] && NODE_FORMAT="hysteria2"
 			#echo $NODE_FORMAT
 			link=$(echo $ssrlink | cut -f3-  -d/ | urldecode | sed 's/[\r\n ]//g')
 			#echo $link
@@ -1994,7 +2093,7 @@ case $ss_online_action in
 	unset_lock
 	;;
 4)
-	# 通过链接添加ss:// ssr:// vmess://
+	# 通过链接添加ss:// ssr:// vmess:// trojan:// vless:// trojan-go:// hysteria2:// hy2:// anytls://
 	set_lock
 	detect
 	add

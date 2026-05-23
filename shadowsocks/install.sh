@@ -49,7 +49,7 @@ if [ -n "$MOUNTED" ];then
 fi
 
 echo_date 清理旧文件
-TARGET_BIN="base64_encode cdns chinadns  chinadns1 chinadns-ng client_linux_arm5 dns2socks dnsmasq haproxy haveged hysteria httping https_dns_proxy jq koolbox koolgame pdu resolveip rss-local rss-redir smartdns speederv1 speederv2 ss-local ss-redir ss-tunnel trojan-go naive udp2raw obfs-local xray"
+TARGET_BIN="base64_encode cdns chinadns  chinadns1 chinadns-ng client_linux_arm5 dns2socks dnsmasq haproxy haveged hysteria anytls httping https_dns_proxy jq koolbox koolgame pdu resolveip rss-local rss-redir smartdns speederv1 speederv2 ss-local ss-redir ss-tunnel trojan-go naive udp2raw obfs-local xray"
 rm -rf /koolshare/ss/*
 rm -rf /koolshare/scripts/ss_*
 rm -rf /koolshare/webs/Main_Ss*
@@ -143,4 +143,3 @@ if [ "$ss_basic_enable" == "1" ];then
 	sh /koolshare/ss/ssconfig.sh restart
 fi
 echo_date 更新完毕，请等待网页自动刷新！
-

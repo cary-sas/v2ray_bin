@@ -5,33 +5,179 @@
 
 source /koolshare/scripts/base.sh
 eval `dbus export ssconf_basic`
+alias echo_date='echo 【$(TZ=UTC-8 date -R +%Y年%m月%d日\ %X)】:'
 
 case "$ssconf_basic_test_domain" in
 	https://www.google.com.hk/)
-		speed_test_url="https://dl.google.com/drive-file-stream/GoogleDriveSetup.exe"
+		latency_test_url="https://www.google.com/generate_204"
 	;;
-	https://www.facebook.com/)
-		speed_test_url="https://scontent-sjc3-1.xx.fbcdn.net/m1/v/t6/An-Y531FBt1_Dmjmdml0fAxWVznPEZ4KhVulHN4RqyLIqKI4Fldv1Q2EBkOSRtG8co5l0O9EVtYm894u1-w.zip?ccb=10-5&oh=00_AT9wS67x0noZvrW6rZWkwT2CNg5Pvk3kmpL9AWsVR8wdvg&oe=62944A47&_nc_sid=857daf"
+	https://www.gstatic.com/generate_204)
+		latency_test_url="https://www.gstatic.com/generate_204"
 	;;
 	*)
-		speed_test_url="https://cdn.cloudflare.steamstatic.com/steam/apps/256843155/movie_max.mp4 "
+		latency_test_url="https://www.google.com/generate_204"
 	;;
 esac
 
-agent="User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:32.0) Gecko/20100101 Firefox/32.0"
+agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:32.0) Gecko/20100101 Firefox/32.0"
 
 speed_test_curl(){
-	sleep 3
-	local Byte=`curl -k -A "$agent" "$speed_test_url" -o /dev/null --socks5-hostname 127.0.0.1:23458 --connect-timeout 5 --max-time 12 2>&1 | tr '\r' '\n' | awk '{print $NF}' | sed '1,3d;$d' | awk 'function max(x){i=0;for(val in x){if(i<=x[val]){i=x[val];}}return i;} {if ($1 ~ /k/) {a[$1]=$1*1024;next} else if ($1 ~ /M/) {a[$1]=$1*1024*1024;next} else {a[$1]=$1;next}} END{print max(a) }'`
-	sleep 1	
-	local KB=`awk -v sum=$Byte -v n=1024 'BEGIN{printf "%0.2f\n", sum/n}'`
-	local MB=`awk -v sum=$KB -v n=1024 'BEGIN{printf "%0.2f\n", sum/n}'`
-	local Byte=${Byte%.*}
-	local KB=${KB%.*}
-	local result=`awk -v M=$MB -v k=$KB -v i=$Byte 'BEGIN { if(i>=1048576) print M"M"; else if(i<1024 && i>0) print i; else print k"K" }'`
-	[ -z "$Byte" -o "$result" == "0K" ] && local result="failed"
-	dbus set ssconf_basic_webtest_$nu=$result
+	sleep 1
+
+	local proxy_host="127.0.0.1"
+	local proxy_port="23458"
+	local warm_timeout=5
+	local score_timeout=5
+	local retry_timeout=5
+
+	local raw=""
+	local score1_ms=""
+	local score2_ms=""
+	local score3_ms=""
+	local best_ms=""
+	local result=""
+	local has_timeout=0
+
+	curl_probe() {
+		local tag="$1"
+		local timeout_sec="$2"
+
+		curl -k -A "$agent" -I "$latency_test_url" -o /dev/null \
+			--socks5-hostname ${proxy_host}:${proxy_port} \
+			--connect-timeout "$timeout_sec" \
+			--max-time "$timeout_sec" \
+			--write-out "${tag}|%{exitcode}|%{http_code}|%{time_total}\n" \
+			-s 2>/dev/null
+	}
+
+	parse_probe_ms() {
+		local line="$1"
+		local exit_code=""
+		local http_code=""
+		local time_total=""
+
+		exit_code=$(echo "$line" | awk -F'|' '{print $2}')
+		http_code=$(echo "$line" | awk -F'|' '{print $3}')
+		time_total=$(echo "$line" | awk -F'|' '{print $4}')
+
+		if [ "$exit_code" = "28" ]; then
+			echo "timeout"
+			return 0
+		fi
+
+		if [ "$exit_code" = "0" ] && [ -n "$time_total" ] && { [ "$http_code" = "200" ] || [ "$http_code" = "204" ] || [ "$http_code" = "301" ] || [ "$http_code" = "302" ]; }; then
+			awk -v t="$time_total" 'BEGIN{
+				ms = int(t * 1000 + 0.5);
+				if (ms > 5000) print "timeout";
+				else print ms;
+			}'
+			return 0
+		fi
+
+		echo ""
+		return 1
+	}
+
+	pick_better_ms() {
+		local a="$1"
+		local b="$2"
+
+		if [ -z "$a" ]; then
+			echo "$b"
+			return 0
+		fi
+		if [ -z "$b" ]; then
+			echo "$a"
+			return 0
+		fi
+		if [ "$a" = "timeout" ]; then
+			echo "$b"
+			return 0
+		fi
+		if [ "$b" = "timeout" ]; then
+			echo "$a"
+			return 0
+		fi
+		if [ "$a" -le "$b" ] 2>/dev/null; then
+			echo "$a"
+		else
+			echo "$b"
+		fi
+	}
+
+	score_latency() {
+		local ms="$1"
+		if [ -z "$ms" ] || [ "$ms" = "failed" ] || [ "$ms" = "timeout" ]; then
+			echo ""
+		elif [ "$ms" -le 400 ] 2>/dev/null; then
+			echo "S"
+		elif [ "$ms" -le 700 ] 2>/dev/null; then
+			echo "A"
+		elif [ "$ms" -le 1000 ] 2>/dev/null; then
+			echo "B"
+		elif [ "$ms" -le 1500 ] 2>/dev/null; then
+			echo "C"
+		else
+			echo "D"
+		fi
+	}
+
+	# 1) warmup：只预热，不计分
+	raw=$(curl_probe "warm" "$warm_timeout")
+	if [ "$(parse_probe_ms "$raw")" = "timeout" ]; then
+		has_timeout=1
+	fi
+
+	# 2) score1
+	raw=$(curl_probe "score1" "$score_timeout")
+	score1_ms=$(parse_probe_ms "$raw")
+	if [ "$score1_ms" = "timeout" ]; then
+		has_timeout=1
+	fi
+
+	# 3) score2
+	raw=$(curl_probe "score2" "$retry_timeout")
+	score2_ms=$(parse_probe_ms "$raw")
+	if [ "$score2_ms" = "timeout" ]; then
+		has_timeout=1
+	fi
+
+	# 4) score3（新增）
+	raw=$(curl_probe "score3" "$retry_timeout")
+	score3_ms=$(parse_probe_ms "$raw")
+	if [ "$score3_ms" = "timeout" ]; then
+		has_timeout=1
+	fi
+
+	# 5) 最终结果：只看后两次的最优值，更接近稳定使用状态
+	best_ms=$(pick_better_ms "$score2_ms" "$score3_ms")
+
+	# 如果后两次都没值，就回退到 score1
+	[ -z "$best_ms" ] && best_ms="$score1_ms"
+
+	if [ -n "$best_ms" ]; then
+		if [ "$best_ms" = "timeout" ]; then
+			result="timeout"
+		else
+			local grade=""
+			grade=$(score_latency "$best_ms")
+			if [ -n "$grade" ]; then
+				result="${best_ms} ms [${grade}]"
+			else
+				result="${best_ms} ms"
+			fi
+		fi
+	else
+		if [ "$has_timeout" = "1" ]; then
+			result="timeout"
+		else
+			result="failed"
+		fi
+	fi
+
+	dbus set ssconf_basic_webtest_$nu="$result"
 }
+
 # flush previous test value in the table
 webtest=`dbus list ssconf_basic_webtest_ | sort -n -t "_" -k 4|cut -d "=" -f 1`
 if [ ! -z "$webtest" ];then
@@ -97,18 +243,17 @@ create_v2ray_json(){
 	rm -f /tmp/tmp_user.json
 	rm -f /tmp/tmp_v2ray.final.json
 
-	# ============================
-	# 新增：优先处理 v2ray_use_json=1 的节点
-	# ============================
-	local use_json=$(eval echo \$ssconf_basic_v2ray_use_json_$nu)
+	# =========================================================
+	# 1) 优先处理：使用自定义 JSON 配置的节点
+	# =========================================================
+		local use_json=$(eval echo \$ssconf_basic_v2ray_use_json_$nu)
 	if [ "$use_json" = "1" ]; then
-		echo_date "webtest: 使用自定义 'v2ray' json 节点..."
+		echo_date "webtest: 使用自定义 JSON 节点..."
 
-		# 解码用户 json（系统里应该已有 base64_decode）
 		local RAW_JSON=$(eval echo \$ssconf_basic_v2ray_json_$nu | base64_decode)
 		echo "$RAW_JSON" > /tmp/tmp_user.json
 
-		# 1) 统一 outbounds 为数组（兼容 outbound / outbounds）
+		# 兼容 outbound / outbounds
 		OUTBOUNDS_ARR=$(jq -c '
 			if (.outbounds? // null) != null then
 				.outbounds
@@ -119,337 +264,384 @@ create_v2ray_json(){
 			end
 		' /tmp/tmp_user.json)
 
-		# 2) 判断是否是 xagg 聚合输入（tag 以 xagg_ 开头）
+		# 是否为 xagg 聚合节点
 		IS_XAGG=$(echo "$OUTBOUNDS_ARR" | jq -r '
 			any(.[]; ((.tag // "") | startswith("xagg_")))
 		')
 
-		# webtest 的基础模板：只保留原来的 socks inbound + log（最小改动）
-		cat >"/tmp/tmp_v2ray.json" <<-EOF
-			{
-			  "log": {
-			    "access": "/dev/null",
-			    "error": "/tmp/v2ray_webtest_log.log",
-			    "loglevel": "error"
-			  },
-			  "inbounds": [
-			    {
-			      "port": 23458,
-			      "listen": "0.0.0.0",
-			      "protocol": "socks",
-			      "settings": {
-			        "auth": "noauth",
-			        "udp": false,
-			        "ip": "127.0.0.1",
-			        "clients": null
-			      },
-			      "streamSettings": null
-			    }
-			  ]
-			}
-		EOF
-
 		if [ "$IS_XAGG" = "true" ]; then
-			echo_date "webtest: 检测到 xagg 聚合节点，补全 routing / observatory..."
+			echo_date "webtest: 检测到 xagg 聚合节点，补全 balancer / routing / observatory ..."
 
-			# 3) 提取 tag 列表
-			TAGS=$(echo "$OUTBOUNDS_ARR" | jq -c '[ .[] | .tag ]')
+			TAGS=$(echo "$OUTBOUNDS_ARR" | jq -c '
+												[ .[]
+													| select((.tag // "") | startswith("xagg_"))
+													| select(.tag != "xagg_meta")
+													| .tag
+												]
+												')
 
-			# webtest 暂时固定策略（主页面才做 UI 动态）
-			XAGG_STRATEGY="leastPing"
-
-			# 4) 生成 routing + observatory
-			ROBS=$(jq -nc --argjson tags "$TAGS" '
-			{
-			  "routing": {
-			    "domainStrategy": "AsIs",
-			    "balancers": [
-			      {
-			        "tag": "balancer-main",
-			        "selector": $tags,
-			        "strategy": { "type": "'"$XAGG_STRATEGY"'" }
-			      }
-			    ],
-			    "rules": [
-			      {
-			        "type": "field",
-			        "inboundTag": [],
-			        "balancerTag": "balancer-main"
-			      }
-			    ]
-			  },
-			  "observatory": {
-			    "subjectSelector": $tags,
-			    "probeURL": "https://www.gstatic.com/generate_204",
-			    "probeInterval": "30s"
-			  }
-			}
-			')
-
-			# 5) 合并写入最终配置
-			jq \
+			jq -nc \
 				--argjson outbounds "$OUTBOUNDS_ARR" \
-				--argjson robs "$ROBS" \
-				'. + {outbounds: $outbounds} + $robs' \
-				/tmp/tmp_v2ray.json > /tmp/tmp_v2ray.final.json
+				--argjson tags "$TAGS" '
+				{
+				  "log": {
+				    "access": "/dev/null",
+				    "error": "/tmp/v2ray_webtest_log.log",
+				    "loglevel": "debug"
+				  },
+				  "inbounds": [
+				    {
+				      "tag": "webtest-socks",
+				      "port": 23458,
+				      "listen": "0.0.0.0",
+				      "protocol": "socks",
+				      "settings": {
+				        "auth": "noauth",
+				        "udp": false,
+				        "ip": "127.0.0.1",
+				        "clients": null
+				      }
+				    }
+				  ],
+				  "outbounds": $outbounds,
+				  "routing": {
+				    "domainStrategy": "AsIs",
+				    "balancers": [
+				      {
+				        "tag": "balancer-main",
+				        "selector": $tags,
+				        "strategy": {
+				          "type": "leastPing"
+				        }
+				      }
+				    ],
+				    "rules": [
+				      {
+				        "type": "field",
+				        "inboundTag": ["webtest-socks"],
+				        "balancerTag": "balancer-main"
+				      }
+				    ]
+				  },
+				  "observatory": {
+				    "subjectSelector": $tags,
+				    "probeURL": "https://www.gstatic.com/generate_204",
+				    "probeInterval": "3s"
+				  }
+				}
+			' > /tmp/tmp_v2ray.json
 		else
-			# 普通自定义 JSON（不启用聚合）
-			jq \
-				--argjson outbounds "$OUTBOUNDS_ARR" \
-				'. + {outbounds: $outbounds}' \
-				/tmp/tmp_v2ray.json > /tmp/tmp_v2ray.final.json
+			echo_date "webtest: 普通 JSON 节点，原样使用 + 追加 23458 socks inbound ..."
+
+			jq '
+				.inbounds = (
+					[
+						{
+							"tag": "webtest-socks",
+							"port": 23458,
+							"listen": "0.0.0.0",
+							"protocol": "socks",
+							"settings": {
+								"auth": "noauth",
+								"udp": false,
+								"ip": "127.0.0.1",
+								"clients": null
+							}
+						}
+					] + (.inbounds // [])
+				)
+			' /tmp/tmp_user.json > /tmp/tmp_v2ray.json
 		fi
 
-		mv /tmp/tmp_v2ray.final.json /tmp/tmp_v2ray.json
+		rm -f /tmp/tmp_user.json
 		return 0
 	fi
 
+	# =========================================================
+	# 2) 非 JSON 节点：按原插件字段动态生成
+	# =========================================================
+	local kcp="null"
+	local tcp="null"
+	local ws="null"
+	local h2="null"
+	local grpc="null"
+	local tls="null"
+	local reality="null"
+	local vless_flow=""
 
-		local kcp="null"
-		local tcp="null"
-		local ws="null"
-		local h2="null"
-		local grpc="null"
+	# tcp和kcp下tlsSettings为null，ws和h2下tlsSettings
+	[ "$(eval echo \$ssconf_basic_v2ray_network_security_$nu)" = "none" ] && local ssconf_basic_v2ray_network_security=""
+
+	if [ "$(eval echo \$ssconf_basic_v2ray_network_$nu)" = "ws" -o "$(eval echo \$ssconf_basic_v2ray_network_$nu)" = "h2" ] && \
+	   [ -z "$(eval echo \$ssconf_basic_v2ray_network_tlshost_$nu)" ] && \
+	   [ -n "$(eval echo \$ssconf_basic_v2ray_network_host_$nu)" ]; then
+		local ssconf_basic_v2ray_network_tlshost_$nu="$(eval echo \$ssconf_basic_v2ray_network_host_$nu)"
+	fi
+
+	local local_fingerprint=$(eval echo \$ssconf_basic_fingerprint_$nu)
+
+	case "$(eval echo \$ssconf_basic_v2ray_network_security_$nu)" in
+	tls)
+		local tls="{
+				\"allowInsecure\": $(get_function_switch $(eval echo \$ssconf_basic_allowinsecure_$nu)),
+				\"fingerprint\": $(get_fingerprint $local_fingerprint),
+				\"serverName\": \"$(eval echo \$ssconf_basic_v2ray_network_tlshost_$nu)\"
+				}"
+		[ "$(eval echo \$ssconf_basic_v2ray_network_flow_$nu)" != "none" -a \
+		  "$(eval echo \$ssconf_basic_v2ray_network_flow_$nu)" != "" ] && \
+		  local vless_flow="\"flow\": \"$(eval echo \$ssconf_basic_v2ray_network_flow_$nu)\"," || \
+		  local vless_flow=""
+		;;
+	reality)
+		local reality="{
+				\"serverName\": \"$(eval echo \$ssconf_basic_v2ray_network_tlshost_$nu)\",
+				\"fingerprint\": $(get_fingerprint $local_fingerprint),
+				\"publicKey\": \"$(eval echo \$ssconf_basic_xray_publicKey_$nu)\",
+				\"shortId\": \"$(eval echo \$ssconf_basic_xray_shortId_$nu)\",
+				\"spiderX\": \"\"
+				}"
+		local vless_flow="\"flow\": \"$(eval echo \$ssconf_basic_v2ray_network_flow_$nu)\","
+		;;
+	*)
 		local tls="null"
 		local reality="null"
-		local vless_flow=""
+		;;
+	esac
 
-		# tcp和kcp下tlsSettings为null，ws和h2下tlsSettings
-		[ "$(eval echo \$ssconf_basic_v2ray_network_security_$nu)" == "none" ] && local ssconf_basic_v2ray_network_security=""
+	# multi-domain host
+	if [ "$(eval echo \$ssconf_basic_v2ray_network_host_$nu | grep ",")" ]; then
+		ssconf_basic_v2ray_network_host_$nu=$(eval echo \$ssconf_basic_v2ray_network_host_$nu | sed 's/,/", "/g')
+	fi
 
-		if [ "$(eval echo \$ssconf_basic_v2ray_network_$nu)" == "ws" -o "$(eval echo \$ssconf_basic_v2ray_network_$nu)" == "h2" ] && [ -z "$(eval echo \$ssconf_basic_v2ray_network_tlshost_$nu)" ] && [ -n "$(eval echo \$ssconf_basic_v2ray_network_host_$nu)" ]; then
-		 	local ssconf_basic_v2ray_network_tlshost_$nu="$(eval echo \$ssconf_basic_v2ray_network_host_$nu)"
-		fi
-
-		local local_fingerprint=$(eval echo \$ssconf_basic_fingerprint_$nu)
-
-		case "$(eval echo \$ssconf_basic_v2ray_network_security_$nu)" in
-		tls)
-			local tls="{
-					\"allowInsecure\":  $(get_function_switch $(eval echo \$ssconf_basic_allowinsecure_$nu)),
-					\"fingerprint\": $(get_fingerprint $local_fingerprint),
-					\"serverName\": \"$(eval echo \$ssconf_basic_v2ray_network_tlshost_$nu)\"
-					}"
-					[ "$(eval echo \$ssconf_basic_v2ray_network_flow_$nu)" != "none" -a "$(eval echo \$ssconf_basic_v2ray_network_flow_$nu)" != "" ] && local vless_flow="\"flow\": \"$(eval echo \$ssconf_basic_v2ray_network_flow_$nu)\"," || local vless_flow=""
-			;;
-		reality)
-			local reality="{
-					\"serverName\": \"$(eval echo \$ssconf_basic_v2ray_network_tlshost_$nu)\",
-					\"fingerprint\": $(get_fingerprint $local_fingerprint),
-					\"publicKey\": \"$(eval echo \$ssconf_basic_xray_publicKey_$nu)\",
-					\"shortId\": \"$(eval echo \$ssconf_basic_xray_shortId_$nu)\",
-					\"spiderX\": \"\"
-					}"
-			local vless_flow="\"flow\": \"$(eval echo \$ssconf_basic_v2ray_network_flow_$nu)\","
-			;;
-		*)
-			local tls="null"
-			local reality="null"
-			;;
-		esac
-
-		# incase multi-domain input
-		if [ "$(eval echo \$ssconf_basic_v2ray_network_host_$nu | grep ",")" ]; then
-			ssconf_basic_v2ray_network_host_$nu=$(eval echo \$ssconf_basic_v2ray_network_host_$nu | sed 's/,/", "/g')
-		fi
-
-		case "$(eval echo \$ssconf_basic_v2ray_network_$nu)" in
-		tcp)
-			if [ "$(eval echo \$ssconf_basic_v2ray_headtype_tcp_$nu)" == "http" ]; then
-				local tcp="{
-					\"connectionReuse\": true,
-					\"header\": {
+	case "$(eval echo \$ssconf_basic_v2ray_network_$nu)" in
+	tcp)
+		if [ "$(eval echo \$ssconf_basic_v2ray_headtype_tcp_$nu)" = "http" ]; then
+			local tcp="{
+				\"connectionReuse\": true,
+				\"header\": {
 					\"type\": \"http\",
 					\"request\": {
-					\"version\": \"1.1\",
-					\"method\": \"GET\",
-					\"path\": [\"/\"],
-					\"headers\": {
-					\"Host\": [\"$(eval echo \$ssconf_basic_v2ray_network_host_$nu)\"],
-					\"User-Agent\": [\"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.75 Safari/537.36\",\"Mozilla/5.0 (iPhone; CPU iPhone OS 10_0_2 like Mac OS X) AppleWebKit/601.1 (KHTML, like Gecko) CriOS/53.0.2785.109 Mobile/14A456 Safari/601.1.46\"],
-					\"Accept-Encoding\": [\"gzip, deflate\"],
-					\"Connection\": [\"keep-alive\"],
-					\"Pragma\": \"no-cache\"
-					}
+						\"version\": \"1.1\",
+						\"method\": \"GET\",
+						\"path\": [\"/\"],
+						\"headers\": {
+							\"Host\": [\"$(eval echo \$ssconf_basic_v2ray_network_host_$nu)\"],
+							\"User-Agent\": [
+								\"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.75 Safari/537.36\",
+								\"Mozilla/5.0 (iPhone; CPU iPhone OS 10_0_2 like Mac OS X) AppleWebKit/601.1 (KHTML, like Gecko) CriOS/53.0.2785.109 Mobile/14A456 Safari/601.1.46\"
+							],
+							\"Accept-Encoding\": [\"gzip, deflate\"],
+							\"Connection\": [\"keep-alive\"],
+							\"Pragma\": \"no-cache\"
+						}
 					},
 					\"response\": {
-					\"version\": \"1.1\",
-					\"status\": \"200\",
-					\"reason\": \"OK\",
-					\"headers\": {
-					\"Content-Type\": [\"application/octet-stream\",\"video/mpeg\"],
-					\"Transfer-Encoding\": [\"chunked\"],
-					\"Connection\": [\"keep-alive\"],
-					\"Pragma\": \"no-cache\"
+						\"version\": \"1.1\",
+						\"status\": \"200\",
+						\"reason\": \"OK\",
+						\"headers\": {
+							\"Content-Type\": [\"application/octet-stream\", \"video/mpeg\"],
+							\"Transfer-Encoding\": [\"chunked\"],
+							\"Connection\": [\"keep-alive\"],
+							\"Pragma\": \"no-cache\"
+						}
 					}
-					}
-					}
-					}"
-			else
-				local tcp="null"
-			fi
-			;;
-		kcp)
-			local local_path=$(eval echo \$ssconf_basic_v2ray_network_path_$nu)
-			local kcp="{
-				\"mtu\": 1350,
-				\"tti\": 50,
-				\"uplinkCapacity\": 12,
-				\"downlinkCapacity\": 100,
-				\"congestion\": false,
-				\"readBufferSize\": 2,
-				\"writeBufferSize\": 2,
-				\"seed\": \"$local_path\",
-				\"header\": {
+				}
+			}"
+		else
+			local tcp="null"
+		fi
+		;;
+	kcp)
+		local local_path=$(eval echo \$ssconf_basic_v2ray_network_path_$nu)
+		local kcp="{
+			\"mtu\": 1350,
+			\"tti\": 50,
+			\"uplinkCapacity\": 12,
+			\"downlinkCapacity\": 100,
+			\"congestion\": false,
+			\"readBufferSize\": 2,
+			\"writeBufferSize\": 2,
+			\"seed\": \"$local_path\",
+			\"header\": {
 				\"type\": \"$(eval echo \$ssconf_basic_v2ray_headtype_kcp_$nu)\",
 				\"request\": null,
 				\"response\": null
-				}
-				}"
-			[ -z "$local_path" ] && local kcp=$(echo $kcp | sed 's/"seed": "*, //')
-			;;
-		ws)
-			local local_path=$(eval echo \$ssconf_basic_v2ray_network_path_$nu)
-			local local_header=$(eval echo \$ssconf_basic_v2ray_network_host_$nu)
-			local ws="{
-				\"connectionReuse\": true,
-				\"fingerprint\": $(get_fingerprint $local_fingerprint),
-				\"path\": $(get_path $local_path),
-				\"headers\": $(get_ws_header $local_header)
-				}"
-			;;
-		h2)
-			local local_path=$(eval echo \$ssconf_basic_v2ray_network_path_$nu)
-			local local_header=$(eval echo \$ssconf_basic_v2ray_network_host_$nu)
-			local h2="{
-				\"fingerprint\": $(get_fingerprint $local_fingerprint),
-				\"path\": $(get_path $local_path),
-				\"host\": $(get_h2_host $local_header)
-				}"
-			;;
-		grpc)
-			local local_serviceName=$(eval echo \$ssconf_basic_v2ray_serviceName_$nu)
-			local grpc="{
-				\"multiMode\": true,
-  				\"idle_timeout\": 13,
-				\"fingerprint\": $(get_fingerprint $local_fingerprint),
-				\"serviceName\": $(get_path $local_serviceName)
-				}"
-			;;
-		esac
+			}
+		}"
+		[ -z "$local_path" ] && local kcp=$(echo $kcp | sed 's/"seed": "*, //')
+		;;
+	ws)
+		local local_path=$(eval echo \$ssconf_basic_v2ray_network_path_$nu)
+		local local_header=$(eval echo \$ssconf_basic_v2ray_network_host_$nu)
+		local ws="{
+			\"connectionReuse\": true,
+			\"fingerprint\": $(get_fingerprint $local_fingerprint),
+			\"path\": $(get_path $local_path),
+			\"headers\": $(get_ws_header $local_header)
+		}"
+		;;
+	h2)
+		local local_path=$(eval echo \$ssconf_basic_v2ray_network_path_$nu)
+		local local_header=$(eval echo \$ssconf_basic_v2ray_network_host_$nu)
+		local h2="{
+			\"fingerprint\": $(get_fingerprint $local_fingerprint),
+			\"path\": $(get_path $local_path),
+			\"host\": $(get_h2_host $local_header)
+		}"
+		;;
+	grpc)
+		local local_serviceName=$(eval echo \$ssconf_basic_v2ray_serviceName_$nu)
+		local grpc="{
+			\"multiMode\": true,
+			\"idle_timeout\": 13,
+			\"fingerprint\": $(get_fingerprint $local_fingerprint),
+			\"serviceName\": $(get_path $local_serviceName)
+		}"
+		;;
+	esac
 
-		# log area
-		cat >"/tmp/tmp_v2ray.json" <<-EOF
+	# log area
+	cat >"/tmp/tmp_v2ray.json" <<-EOF
+		{
+		"log": {
+			"access": "/dev/null",
+			"error": "/tmp/v2ray_webtest_log.log",
+			"loglevel": "error"
+		},
+	EOF
+
+	# inbounds area (23458 for socks5)
+	cat >>"/tmp/tmp_v2ray.json" <<-EOF
+		"inbounds": [
 			{
-			"log": {
-				"access": "/dev/null",
-				"error": "/tmp/v2ray_webtest_log.log",
-				"loglevel": "error"
-			},
-		EOF
+				"tag": "socks-in",
+				"port": 23458,
+				"listen": "0.0.0.0",
+				"protocol": "socks",
+				"settings": {
+					"auth": "noauth",
+					"udp": false,
+					"ip": "127.0.0.1",
+					"clients": null
+				}
+			}
+		],
+	EOF
 
-		# inbounds area (23458 for socks5)
+	# outbounds area
+	if [ "$array13" = "vmess" ]; then
 		cat >>"/tmp/tmp_v2ray.json" <<-EOF
-				"inbounds": [
-					{
-						"port": 23458,
-						"listen": "0.0.0.0",
-						"protocol": "socks",
-						"settings": {
-							"auth": "noauth",
-							"udp": false,
-							"ip": "127.0.0.1",
-							"clients": null
-						},
-						"streamSettings": null
-					}
-				],
+		"outbounds": [
+			{
+				"tag": "agentout",
+				"protocol": "vmess",
+				"settings": {
+					"vnext": [
+						{
+							"address": "$(dbus get ssconf_basic_server_$nu)",
+							"port": $(eval echo \$ssconf_basic_port_$nu),
+							"users": [
+								{
+									"id": "$(eval echo \$ssconf_basic_v2ray_uuid_$nu)",
+									"alterId": $(eval echo \$ssconf_basic_v2ray_alterid_$nu),
+									"security": "$(eval echo \$ssconf_basic_v2ray_security_$nu)"
+								}
+							]
+						}
+					],
+					"servers": null
+				},
+				"streamSettings": {
+					"network": "$(eval echo \$ssconf_basic_v2ray_network_$nu)",
+					"security": "$(eval echo \$ssconf_basic_v2ray_network_security_$nu)",
+					"tlsSettings": $tls,
+					"tcpSettings": $tcp,
+					"kcpSettings": $kcp,
+					"wsSettings": $ws,
+					"httpSettings": $h2,
+					"grpcSettings": $grpc
+				},
+				"mux": {
+					"enabled": $(get_function_switch $(eval echo \$ssconf_basic_v2ray_mux_enable_$nu)),
+					"concurrency": 8
+				}
+			},
+			{
+				"tag": "direct",
+				"protocol": "freedom",
+				"settings": {}
+			}
+		],
+		"routing": {
+			"rules": [
+				{
+					"type": "field",
+					"inboundTag": ["socks-in"],
+					"outboundTag": "agentout"
+				}
+			]
+		}
+		}
 		EOF
 
-		# outbounds area
-		if [ "$array13" == "vmess" ]; then
-			cat >>"/tmp/tmp_v2ray.json" <<-EOF
-				"outbounds": [
-				  {
-					"tag": "agentout",
-					"protocol": "vmess",
-					"settings": {
-					  "vnext": [
+	elif [ "$array13" = "vless" ]; then
+		cat >>"/tmp/tmp_v2ray.json" <<-EOF
+		"outbounds": [
+			{
+				"tag": "agentout",
+				"protocol": "vless",
+				"settings": {
+					"vnext": [
 						{
-						  "address": "$(dbus get ssconf_basic_server_$nu)",
-						  "port": $(eval echo \$ssconf_basic_port_$nu),
-						  "users": [
-							{
-							  "id": "$(eval echo \$ssconf_basic_v2ray_uuid_$nu)",
-							  "alterId": $(eval echo \$ssconf_basic_v2ray_alterid_$nu),
-							  "security": "$(eval echo \$ssconf_basic_v2ray_security_$nu)"
-							}
-						  ]
+							"address": "$(dbus get ssconf_basic_server_$nu)",
+							"port": $(eval echo \$ssconf_basic_port_$nu),
+							"users": [
+								{
+									"id": "$(eval echo \$ssconf_basic_v2ray_uuid_$nu)",
+									"level": 1,
+									$vless_flow
+									"encryption": "none"
+								}
+							]
 						}
-					  ],
-					  "servers": null
-					},
-					"streamSettings": {
-					  "network": "$(eval echo \$ssconf_basic_v2ray_network_$nu)",
-					  "security": "$(eval echo \$ssconf_basic_v2ray_network_security_$nu)",
-					  "tlsSettings": $tls,
-					  "tcpSettings": $tcp,
-					  "kcpSettings": $kcp,
-					  "wsSettings": $ws,
-					  "httpSettings": $h2,
-					  "grpcSettings": $grpc
-					},
-					"mux": {
-					  "enabled": $(get_function_switch $(eval echo \$ssconf_basic_v2ray_mux_enable_$nu)),
-					  "concurrency": 8
-					}
-				  }
-				]
+					],
+					"servers": null
+				},
+				"streamSettings": {
+					"network": "$(eval echo \$ssconf_basic_v2ray_network_$nu)",
+					"security": "$(eval echo \$ssconf_basic_v2ray_network_security_$nu)",
+					"tlsSettings": $tls,
+					"realitySettings": $reality,
+					"tcpSettings": $tcp,
+					"kcpSettings": $kcp,
+					"wsSettings": $ws,
+					"httpSettings": $h2,
+					"grpcSettings": $grpc
+				},
+				"mux": {
+					"enabled": $(get_function_switch $(eval echo \$ssconf_basic_v2ray_mux_enable_$nu)),
+					"concurrency": 8
 				}
-			EOF
-		elif [ "$array13" == "vless" ]; then
-			cat >>"/tmp/tmp_v2ray.json" <<-EOF
-				"outbounds": [
-				  {
-					"tag": "agentout",
-					"protocol": "vless",
-					"settings": {
-					  "vnext": [
-						{
-						  "address": "$(dbus get ssconf_basic_server_$nu)",
-						  "port": $(eval echo \$ssconf_basic_port_$nu),
-						  "users": [
-							{
-							  "id": "$(eval echo \$ssconf_basic_v2ray_uuid_$nu)",
-							  "level": 1,
-							  $vless_flow
-							  "encryption": "none"
-							}
-						  ]
-						}
-					  ],
-					  "servers": null
-					},
-					"streamSettings": {
-					  "network": "$(eval echo \$ssconf_basic_v2ray_network_$nu)",
-					  "security": "$(eval echo \$ssconf_basic_v2ray_network_security_$nu)",
-					  "tlsSettings": $tls,
-					  "realitySettings": $reality,
-					  "tcpSettings": $tcp,
-					  "kcpSettings": $kcp,
-					  "wsSettings": $ws,
-					  "httpSettings": $h2,
-					  "grpcSettings": $grpc
-					},
-					"mux": {
-					  "enabled": $(get_function_switch $(eval echo \$ssconf_basic_v2ray_mux_enable_$nu)),
-					  "concurrency": 8
-					}
-				  }
-				]
+			},
+			{
+				"tag": "direct",
+				"protocol": "freedom",
+				"settings": {}
+			}
+		],
+		"routing": {
+			"rules": [
+				{
+					"type": "field",
+					"inboundTag": ["socks-in"],
+					"outboundTag": "agentout"
 				}
-			EOF
-		fi
+			]
+		}
+		}
+		EOF
+	fi
 }
 
 create_trojan_json(){
@@ -675,8 +867,6 @@ start_webtest(){
 	fi
 	[ "$SS2022_webtest" == "Y" ] && array12="3"
 
-	[ "$array17" == "xray" ] && array17="xray run"
-
 	if [ "$array10" != "" ];then
 		if [ "$array9" == "1" ];then
 			ARG_V2RAY_PLUGIN="--plugin v2ray-plugin --plugin-opts $array10"
@@ -728,9 +918,21 @@ start_webtest(){
 
 		elif [ "$array12" == "3" ] && [ "$SS2022_webtest" != "Y" ];then   #v2ray
 			create_v2ray_json 
-			$array17 -config=/tmp/tmp_v2ray.json >/dev/null 2>&1 &
+			xray run -config=/tmp/tmp_v2ray.json >/dev/null 2>&1 &
+			local i=0
+			while [ "$i" -lt 20 ]
+			do
+				netstat -nl 2>/dev/null | grep -q '[:.]23458[[:space:]]' && break
+				sleep 1
+				i=$((i + 1))
+			done
+
+			# xagg observatory 需要额外时间
+			if jq -e '.observatory? // empty' /tmp/tmp_v2ray.json >/dev/null 2>&1; then
+				sleep 5
+			fi
 			speed_test_curl
-			kill -9 `ps|grep "$array17" |grep 'tmp_v2ray'|awk '{print $1}'` >/dev/null 2>&1	
+			kill -9 `ps|grep 'xray' |grep 'tmp_v2ray'|awk '{print $1}'` >/dev/null 2>&1
 			rm -f /tmp/tmp_v2ray.json /tmp/v2ray_webtest_log.log
 
 		elif [ "$array12" == "3" ] && [ "$SS2022_webtest" == "Y" ];then   #ShadowSocks 2022
@@ -761,6 +963,22 @@ start_webtest(){
 			speed_test_curl
 			kill -9 `ps|grep hysteria|grep 'tmp_hysteria'|awk '{print $1}'` >/dev/null 2>&1	
 			rm -f /tmp/tmp_hysteria.json
+
+		elif [ "$array12" == "4" -a "$array14" == "AnyTLS" ];then   #AnyTLS
+			if [ -n "$(eval echo \$ssconf_basic_trojan_sni_$nu)" ]; then
+				anytls -socks 127.0.0.1:23458 -nat 0.0.0.0:3334 -s "${array1}:${array2}" -p "$array3" -sni "$(eval echo \$ssconf_basic_trojan_sni_$nu)" >/dev/null 2>&1 &
+			else
+				anytls -socks 127.0.0.1:23458 -nat 0.0.0.0:3334 -s "${array1}:${array2}" -p "$array3" >/dev/null 2>&1 &
+			fi
+			local i=0
+			while [ "$i" -lt 10 ]
+			do
+				netstat -nl 2>/dev/null | grep -q '[:.]23458[[:space:]]' && break
+				sleep 1
+				i=$((i + 1))
+			done
+			speed_test_curl
+			kill -9 `ps|grep -w anytls|grep -w '23458'|awk '{print $1}'` >/dev/null 2>&1
 			
 		elif [ "$array12" == "5" ];then   #naive
 			create_naive_json 
@@ -781,7 +999,7 @@ if [ "$ssconf_basic_test_node" != "0" ];then
 	nu="$ssconf_basic_test_node"
 	start_webtest
 else
-	server_nu=`dbus list ssconf_basic_server | sort -n -t "_" -k 4|cut -d "=" -f 1|cut -d "_" -f 4`
+	server_nu=`dbus list ssconf_basic_name_ | sort -n -t "_" -k 4 | cut -d "=" -f 1 | cut -d "_" -f 4`
 	for nu in $server_nu
 	do
 		start_webtest
