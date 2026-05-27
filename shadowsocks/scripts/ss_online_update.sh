@@ -1012,7 +1012,6 @@ add_anytls_servers(){
 	dbus set ssconf_basic_type_$anytlsindex="4"
 	dbus set ssconf_basic_trojan_binary_$anytlsindex=$binary
 	dbus set ssconf_basic_trojan_sni_$anytlsindex=$sni
-	dbus set ssconf_basic_trojan_network_$anytlsindex=$v2ray_net
 	dbus set ssconf_basic_allowinsecure_$anytlsindex=$insecure
 
 	echo_date "AnyTLS 节点：新增加 【$remarks】 到节点列表第 $anytlsindex_x 位。"
@@ -1035,7 +1034,6 @@ update_anytls_config(){
 		dbus_update_if_diff "ssconf_basic_port_$index" "$server_port" && i=$((i+1))
 		dbus_update_if_diff "ssconf_basic_password_$index" "$password" && i=$((i+1))
 		dbus_update_if_diff "ssconf_basic_trojan_binary_$index" "$binary" && i=$((i+1))
-		dbus_update_if_diff "ssconf_basic_trojan_network_$index" "$v2ray_net" && i=$((i+1))
 		dbus_update_if_diff "ssconf_basic_trojan_sni_$index" "$sni" && i=$((i+1))
 		dbus_update_if_diff "ssconf_basic_allowinsecure_$index" "$insecure" && i=$((i+1))
 
@@ -1593,7 +1591,7 @@ get_oneline_rule_now(){
 	
 	if [ "$ss_basic_online_links_goss" == "1" ];then
 		open_socks_23456
-		socksopen_b=`netstat -nlp|grep -w 23456|grep -E "local|xray|trojan-go|naive|hysteria|anytls"`
+		socksopen_b=`netstat -nlp|grep -w 23456|grep -E "local|xray|naive|hysteria|anytls"`
 		if [ -n "$socksopen_b" ];then
 			echo_date "使用$(get_type_name $ss_basic_type)提供的socks代理网络下载..."
 			curl -k --connect-timeout 8 -s -A "v2rayN" -L --socks5-hostname 127.0.0.1:23456 $ssr_subscribe_link > /tmp/ssr_subscribe_file.txt

@@ -583,30 +583,32 @@ function openssHint(itemNum) {
 		return overlib(statusmenu, OFFSETX, -560, OFFSETY, -290, LEFT, STICKY, WIDTH, 'width', CAPTION, _caption, CLOSETITLE, '');
 	} else if (itemNum == 30) {
 		width = "750px";
-		statusmenu = "<b>此处控制开启或者关闭tls传输</b>"
-		statusmenu += "</br></br>此参数在客户端json配置文件的【outbound → streamSettings → security】位置"
+		statusmenu = "<b>此处控制底层传输安全类型。</b>"
+		statusmenu += "</br></br>none 表示关闭；tls 表示使用 TLS；reality 表示使用 Xray Reality。"
+		statusmenu += "</br></br>此参数对应客户端 json 的【outbound → streamSettings → security】位置。选择 reality 时还需要填写 SNI、publicKey、shortId 和指纹等参数。"
 		_caption = "底层传输安全";
 		return overlib(statusmenu, OFFSETX, -560, OFFSETY, -90, LEFT, STICKY, WIDTH, 'width', CAPTION, _caption, CLOSETITLE, '');
 	} else if (itemNum == 110) {
 		width = "750px";
-		statusmenu = "<b>SNI全称Server Name Indication，它扩展了TLS协议。在该协议下，在握手过程开始时客户端告诉它正在连接的服务器要连接的主机名称</b>"
-		statusmenu += "</br></br>此参数在客户端json配置文件的【outbound → streamSettings → (x)tlsSetxtings → serverName】位置"
-		statusmenu += "</br></br>一般对于xtls就留空，ws+tls的话就填成和【伪装域名 (host)】一样"
+		statusmenu = "<b>SNI 是 TLS 握手时声明的服务器名称。</b>"
+		statusmenu += "</br></br>V2Ray/Xray 节点中对应 streamSettings 的 tlsSettings/realitySettings serverName；Trojan、Trojan-Go、Hysteria2、AnyTLS 中用于指定远端 TLS/SNI 域名。"
+		statusmenu += "</br></br>一般填写证书对应的域名；如果服务端没有要求或已经能从服务器地址推断，可以留空。"
 		_caption = "tls/xtls域名 (SNI)";
-		return overlib(statusmenu, OFFSETX, -560, OFFSETY, -90, LEFT, STICKY, WIDTH, 'width', CAPTION, _caption, CLOSETITLE, '');	
+		return overlib(statusmenu, OFFSETX, -560, OFFSETY, -90, LEFT, STICKY, WIDTH, 'width', CAPTION, _caption, CLOSETITLE, '');
 	} else if (itemNum == 111) {
 		width = "750px";
-		statusmenu = "<b>传输层安全性协议</b>"
-		statusmenu += "</br></br>建议为 xtls-rprx-direct"
+		statusmenu = "<b>VLESS 流控参数，仅在 VLESS + TCP + TLS/Reality 场景下使用。</b>"
+		statusmenu += "</br></br>当前插件提供 xtls-rprx-vision 和 xtls-rprx-vision-udp443。"
+		statusmenu += "</br></br>如果服务端没有配置 vision 流控，此处请留空。"
 		_caption = "流控 (flow)";
 		return overlib(statusmenu, OFFSETX, -560, OFFSETY, -90, LEFT, STICKY, WIDTH, 'width', CAPTION, _caption, CLOSETITLE, '');
 	} else if (itemNum == 112) {
 		width = "750px";
-		statusmenu = "勾选后，不会检查远端主机所提供的 TLS 证书的有效性</b>"
-		statusmenu += "</br>自建节点，服务端证书不可以是 Let's Encrypt证书，因为设备已经不再受支持"
-		statusmenu += "</br></br>如果是用机场，建议勾选"
+		statusmenu = "<b>勾选后，将跳过远端 TLS 证书校验。</b>"
+		statusmenu += "</br></br>仅建议在自签证书、旧设备证书链不完整，或服务商明确要求时开启。"
+		statusmenu += "</br></br>证书正常且域名匹配时，建议保持关闭。"
 		_caption = "是否允许不安全连接";
-		return overlib(statusmenu, OFFSETX, -560, OFFSETY, -90, LEFT, STICKY, WIDTH, 'width', CAPTION, _caption, CLOSETITLE, '');		
+		return overlib(statusmenu, OFFSETX, -560, OFFSETY, -90, LEFT, STICKY, WIDTH, 'width', CAPTION, _caption, CLOSETITLE, '');
 	}  else if (itemNum == 113) {
 		width = "750px";
 		statusmenu = "<b>必填，服务端私钥对应的公钥。</b>"
@@ -615,9 +617,9 @@ function openssHint(itemNum) {
 		return overlib(statusmenu, OFFSETX, -560, OFFSETY, -90, LEFT, STICKY, WIDTH, 'width', CAPTION, _caption, CLOSETITLE, '');
 	}  else if (itemNum == 114) {
 		width = "750px";
-		statusmenu = "<b>启用后，Xray 将通过 uTLS 库 模拟 TLS 指纹，或随机生成。</b>"
-		statusmenu += "</br></br>TrojanGo的指纹和Xray的不完全一样，reality协议中需要开启指纹"
-		statusmenu += "</br></br>其他协议包括 xray ws, H2, gRPC, tls 都支持开启指纹"
+		statusmenu = "<b>TLS 指纹用于模拟不同客户端的 TLS ClientHello。</b>"
+		statusmenu += "</br></br>Xray/V2Ray TLS、Reality 以及 Trojan-Go 可使用此项；Reality 通常需要按服务端配置填写。"
+		statusmenu += "</br></br>如果服务端或订阅没有给出该参数，可以留空/关闭。"
 		_caption = "指纹 (fingerprint)";
 		return overlib(statusmenu, OFFSETX, -560, OFFSETY, -90, LEFT, STICKY, WIDTH, 'width', CAPTION, _caption, CLOSETITLE, '');
 	}  else if (itemNum == 115) {
@@ -636,10 +638,20 @@ function openssHint(itemNum) {
 		return overlib(statusmenu, OFFSETX, -560, OFFSETY, -90, LEFT, STICKY, WIDTH, 'width', CAPTION, _caption, CLOSETITLE, '');
 	}  else if (itemNum == 117) {
 		width = "750px";
-		statusmenu = "<b>开启 TLS Hello Fragment</b>"
-		statusmenu += "</br></br> xray 1.8.3 版本开始支持 TLS Hello Fragment"
-		statusmenu += "</br></br>开启后可以防止 TLS 握手被检测到，增加隐蔽性"
+		statusmenu = "<b>开启 TLS ClientHello 分片。</b>"
+		statusmenu += "</br></br>当前插件会在支持的 Xray/V2Ray 或 Trojan TLS 配置中写入分片参数，用于降低 TLS 握手被特征识别的概率。"
+		statusmenu += "</br></br>如果开启后连接异常，请关闭此项。"
 		_caption = "TLS Hello Fragment";
+		return overlib(statusmenu, OFFSETX, -560, OFFSETY, -90, LEFT, STICKY, WIDTH, 'width', CAPTION, _caption, CLOSETITLE, '');
+	}  else if (itemNum == 118) {
+		width = "750px";
+		statusmenu = "<b>Hysteria2 全局设定默认不填。</b>"
+		statusmenu += "</br></br>所有项目都留空时，不会生成全局 JSON，也不会覆盖节点配置。"
+		statusmenu += "</br></br><font color='#CC0066'><b>混淆：</b></font>支持 salamander/gecko，启用后必须填写和服务端一致的密码；gecko 可选最小/最大包大小。"
+		statusmenu += "</br></br><font color='#CC0066'><b>拥塞控制：</b></font>默认使用 bbr + standard，也可以选择 bbr/reno；bbr 可选 standard、conservative、aggressive。"
+		statusmenu += "</br></br><font color='#CC0066'><b>带宽：</b></font>填写上行/下行 mbps 后，对应方向会使用 Brutal 速率控制；未填写的方向继续使用拥塞控制。"
+		statusmenu += "</br></br>参考：<a href='https://v2.hysteria.network/docs/advanced/Full-Client-Config/' target='_blank'><u><font color='#00F'>Hysteria2 官方客户端配置文档</font></u></a>"
+		_caption = "Hysteria2 全局设定";
 		return overlib(statusmenu, OFFSETX, -560, OFFSETY, -90, LEFT, STICKY, WIDTH, 'width', CAPTION, _caption, CLOSETITLE, '');
 	}
 	else if (itemNum == 31) {
@@ -736,7 +748,7 @@ function openssHint(itemNum) {
 	} else if (itemNum == 49) {
 		width = "750px";
 		statusmenu = "</br>此参数在客户端json配置文件的【outbound → settings → vnext → users → id】位置"
-		_caption = "加密方式 (security)";
+		_caption = "用户id（id）";
 		return overlib(statusmenu, OFFSETX, -560, OFFSETY, -90, LEFT, STICKY, WIDTH, 'width', CAPTION, _caption, CLOSETITLE, '');
 	} else if (itemNum == 50) {
 		width = "750px";
@@ -804,10 +816,35 @@ function openssHint(itemNum) {
 		width = "600px";
 		statusmenu = "节点域名解析DNS服务器.<br />&nbsp;&nbsp;&nbsp;&nbsp;一些SS/SSR/V2RAY的服务器为域名格式，在启用的时候需要对其进行解析，以获取正确的IP地址，此处定义用以解析服务器域名的DNS服务器。<br />&nbsp;&nbsp;&nbsp;&nbsp;一些机场节点的域名托管在国外服务商，此时自定义定义国外的DNS服务器效果可能更好。"
 		_caption = "说明：";
+	} else if (itemNum == 108) {
+		width = "650px";
+		statusmenu = "<b>选择当前 Trojan 类节点使用的客户端协议。</b>"
+		statusmenu += "</br></br><font color='#CC0066'><b>Trojan：</b></font>标准 Trojan 客户端，使用服务器、端口、密码和 SNI 等参数。"
+		statusmenu += "</br></br><font color='#CC0066'><b>Trojan-Go：</b></font>支持 WebSocket 混淆、指纹和 Mux 等扩展参数。"
+		statusmenu += "</br></br><font color='#CC0066'><b>Hysteria2：</b></font>使用 Hysteria2 客户端，支持 SNI、允许不安全和全局 obfs/congestion/bandwidth 设定。"
+		statusmenu += "</br></br><font color='#CC0066'><b>AnyTLS：</b></font>使用 AnyTLS 客户端，主要使用服务器、端口、密码和可选 SNI。"
+		_caption = "Trojan 类协议";
+		return overlib(statusmenu, OFFSETX, -560, OFFSETY, -90, LEFT, STICKY, WIDTH, 'width', CAPTION, _caption, CLOSETITLE, '');
 	} else if (itemNum == 109) {
 		width = "450px";
-		statusmenu = "</br>选择对应的协议"
-		_caption = "协议protocol（vmess/vless/trojan）";
+		statusmenu = "</br>选择 V2Ray/Xray 节点的出站协议。"
+		statusmenu += "</br></br>vmess 使用 UUID、alterId 和 security；vless 使用 UUID，并可配合 TLS/Reality、flow、publicKey、shortId 等参数。"
+		_caption = "协议protocol（vmess/vless）";
+	} else if (itemNum == 119) {
+		width = "650px";
+		statusmenu = "<b>Trojan-Go 的传输混淆选项。</b>"
+		statusmenu += "</br></br>选择 none 时使用普通 Trojan-Go 连接。"
+		statusmenu += "</br></br>选择 websocket 时，需要填写 WebSocket host/path，并与服务端或订阅参数保持一致。"
+		statusmenu += "</br></br>此项只对 Trojan-Go 生效，Trojan、Hysteria2、AnyTLS 不使用该设置。"
+		_caption = "Trojan-Go 混淆";
+		return overlib(statusmenu, OFFSETX, -560, OFFSETY, -90, LEFT, STICKY, WIDTH, 'width', CAPTION, _caption, CLOSETITLE, '');
+	} else if (itemNum == 120) {
+		width = "650px";
+		statusmenu = "<b>gRPC 传输使用的 serviceName。</b>"
+		statusmenu += "</br></br>仅在 V2Ray/Xray 传输协议选择 grpc 时使用，对应 gRPC 服务名。"
+		statusmenu += "</br></br>需要与服务端 gRPC 配置完全一致；不是 grpc 传输时请留空。"
+		_caption = "serviceName";
+		return overlib(statusmenu, OFFSETX, -560, OFFSETY, -90, LEFT, STICKY, WIDTH, 'width', CAPTION, _caption, CLOSETITLE, '');
 	} else if (itemNum == 211) {
 		width = "550px";
 		statusmenu = "</br>leastPing：自动选择延迟最低的节点（推荐，最稳定）</br>roundRobin：节点轮流使用，适合多节点均衡</br>random：随机选择节点，不保证稳定性"

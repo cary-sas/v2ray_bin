@@ -11,13 +11,14 @@ fixed many historical legacy issues
 * 支持多个 xray 节点聚合，负载平衡，
 * 支持混合节点订阅，
 * 支持同时订阅多个链接，回车隔开，
-* 支持ss:// vless:// trojan:// trojan-go:// hysteria2:// anytls:// 格式订阅和导入，
+* 支持ss:// vless:// trojan:// trojan-go:// hysteria2:// hy2:// anytls:// 格式订阅和导入，
 * 支持smartDNS (不熟悉配置请勿选择)，ChinaDNS-NG
 * 支持在线更新
 
-目前 xray 完全替代了 v2ray，xray 支持 vmess，vless，trojan 和 ss2022。
+目前 xray 完全替代了 v2ray，trojan-go，xray 支持 vmess，vless，trojan，trojan-go ws 和 ss2022。
 
 NaiveProxy 使用下来也还不错，延迟很低，速度也很快。
+Hysteria2 目前是最稳定，速度也是最快的。 
 
 离线安装包仅能在 koolshare 梅林 arm 380 平台，且 linux 内核为 2.6.36.4 的 armv7 架构的机器上使用！
 

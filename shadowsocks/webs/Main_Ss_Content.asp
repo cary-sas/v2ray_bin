@@ -239,6 +239,162 @@ function isJSON(str) {
 	//console.log('It is not a string!')
 }
 
+function makeHy2Bandwidth(label, valueId) {
+	var value = E(valueId) ? $.trim(E(valueId).value) : "";
+	if (!value) {
+		return "";
+	}
+	if (!/^[0-9]+(\.[0-9]+)?$/.test(value)) {
+		alert("错误！Hysteria2 " + label + "带宽数值必须是数字！");
+		return false;
+	}
+	return value + " mbps";
+}
+
+function loadHy2Bandwidth(value, valueId) {
+	if (!value) {
+		return;
+	}
+	var match = String(value).match(/^\s*([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z]+)\s*$/);
+	if (match && /^(mbps|mb|m)$/i.test(match[2])) {
+		E(valueId).value = match[1];
+	} else {
+		E(valueId).value = value;
+	}
+}
+
+function validateHy2GlobalJson() {
+	var obj = {};
+	var obfsType = E("ss_basic_hy2_obfs_type") ? E("ss_basic_hy2_obfs_type").value : "";
+	var obfsPassword = E("ss_basic_hy2_obfs_password") ? $.trim(E("ss_basic_hy2_obfs_password").value) : "";
+	var geckoMin = E("ss_basic_hy2_gecko_min") ? $.trim(E("ss_basic_hy2_gecko_min").value) : "";
+	var geckoMax = E("ss_basic_hy2_gecko_max") ? $.trim(E("ss_basic_hy2_gecko_max").value) : "";
+	var congestionType = E("ss_basic_hy2_congestion_type") ? E("ss_basic_hy2_congestion_type").value : "";
+	var bbrProfile = E("ss_basic_hy2_bbr_profile") ? E("ss_basic_hy2_bbr_profile").value : "";
+	var bandwidthUp = makeHy2Bandwidth("上行", "ss_basic_hy2_bandwidth_up_value");
+	var bandwidthDown = makeHy2Bandwidth("下行", "ss_basic_hy2_bandwidth_down_value");
+
+	if (bandwidthUp === false || bandwidthDown === false) {
+		return false;
+	}
+
+	if (obfsType) {
+		if (!obfsPassword) {
+			alert("错误！启用 Hysteria2 混淆时必须填写混淆密码！");
+			return false;
+		}
+		obj.obfs = { type: obfsType };
+		obj.obfs[obfsType] = { password: obfsPassword };
+		if (obfsType == "gecko") {
+			if (geckoMin) {
+				if (!/^[0-9]+$/.test(geckoMin)) {
+					alert("错误！Gecko 最小包大小必须是数字！");
+					return false;
+				}
+				obj.obfs.gecko.minPacketSize = parseInt(geckoMin, 10);
+			}
+			if (geckoMax) {
+				if (!/^[0-9]+$/.test(geckoMax)) {
+					alert("错误！Gecko 最大包大小必须是数字！");
+					return false;
+				}
+				obj.obfs.gecko.maxPacketSize = parseInt(geckoMax, 10);
+			}
+			if (obj.obfs.gecko.minPacketSize && obj.obfs.gecko.maxPacketSize && obj.obfs.gecko.maxPacketSize < obj.obfs.gecko.minPacketSize) {
+				alert("错误！Gecko 最大包大小不能小于最小包大小！");
+				return false;
+			}
+			if (obj.obfs.gecko.maxPacketSize && obj.obfs.gecko.maxPacketSize > 2048) {
+				alert("错误！Gecko 最大包大小不能超过 2048！");
+				return false;
+			}
+		}
+	}
+	if (congestionType) {
+		obj.congestion = { type: congestionType };
+		if (congestionType == "bbr") {
+			obj.congestion.bbrProfile = bbrProfile || "standard";
+		}
+	}
+	if (bandwidthUp || bandwidthDown) {
+		obj.bandwidth = {};
+		if (bandwidthUp) {
+			obj.bandwidth.up = bandwidthUp;
+		}
+		if (bandwidthDown) {
+			obj.bandwidth.down = bandwidthDown;
+		}
+	}
+	E("ss_basic_hy2_global_json").value = Object.keys(obj).length ? JSON.stringify(obj, null, 2) : "";
+	var text = E("ss_basic_hy2_global_json").value;
+	if (!text) {
+		return true;
+	}
+	try {
+		obj = JSON.parse(text);
+		var allowed = {
+			"obfs": true,
+			"congestion": true,
+			"bandwidth": true
+		};
+		if (!obj || Object.prototype.toString.call(obj) != "[object Object]" || Object.keys(obj).length == 0) {
+			alert("错误！Hysteria2 全局设定必须是包含 obfs、congestion 或 bandwidth 的 JSON 对象！");
+			return false;
+		}
+		for (var key in obj) {
+			if (!allowed[key]) {
+				alert("错误！Hysteria2 全局设定目前只支持 obfs、congestion、bandwidth 三个顶层字段！");
+				return false;
+			}
+		}
+		E("ss_basic_hy2_global_json").value = JSON.stringify(obj, null, 2);
+		return true;
+	} catch (e) {
+		alert("错误！Hysteria2 全局设定不是正确的 JSON 格式！");
+		return false;
+	}
+}
+
+function loadHy2GlobalForm() {
+	var el = E("ss_basic_hy2_global_json");
+	if (!el || !el.value) {
+		return;
+	}
+	try {
+		var obj = JSON.parse(el.value);
+		if (obj.obfs && obj.obfs.type) {
+			E("ss_basic_hy2_obfs_type").value = obj.obfs.type;
+			if (obj.obfs[obj.obfs.type] && obj.obfs[obj.obfs.type].password) {
+				E("ss_basic_hy2_obfs_password").value = obj.obfs[obj.obfs.type].password;
+			}
+			if (obj.obfs.type == "gecko" && obj.obfs.gecko) {
+				E("ss_basic_hy2_gecko_min").value = obj.obfs.gecko.minPacketSize || "";
+				E("ss_basic_hy2_gecko_max").value = obj.obfs.gecko.maxPacketSize || "";
+			}
+		}
+		if (obj.congestion && obj.congestion.type) {
+			E("ss_basic_hy2_congestion_type").value = obj.congestion.type;
+			E("ss_basic_hy2_bbr_profile").value = obj.congestion.bbrProfile || "standard";
+		}
+		if (obj.bandwidth) {
+			loadHy2Bandwidth(obj.bandwidth.up, "ss_basic_hy2_bandwidth_up_value");
+			loadHy2Bandwidth(obj.bandwidth.down, "ss_basic_hy2_bandwidth_down_value");
+		}
+		updateHy2GlobalForm();
+	} catch (e) {
+		console.log("Hysteria2 global config parse error: " + e);
+	}
+}
+
+function updateHy2GlobalForm() {
+	var obfsType = E("ss_basic_hy2_obfs_type").value;
+	var congestionType = E("ss_basic_hy2_congestion_type").value;
+	showhide("ss_basic_hy2_obfs_password_span", !!obfsType);
+	showhide("ss_basic_hy2_gecko_br", obfsType == "gecko");
+	showhide("ss_basic_hy2_gecko_span", obfsType == "gecko");
+	showhide("ss_basic_hy2_bbr_profile_span", congestionType == "bbr");
+}
+
 function save() {
 	var node_sel = E("ssconf_basic_node").value
 	if (!node_sel) {
@@ -253,13 +409,16 @@ function save() {
 	E("ss_basic_server").value = $.trim($("#ss_basic_server").val());
 	E("ss_basic_port").value = $.trim($("#ss_basic_port").val());
 	E("ss_basic_password").value = $.trim($("#ss_basic_password").val());
+	if (!validateHy2GlobalJson()) {
+		return false;
+	}
 	//define dbus object to save
 	var dbus = {};
 	//key define
 	var params_input = ["ssconf_basic_node", "ss_basic_mode", "ss_basic_server", "ss_basic_port", "ss_basic_method", "ss_basic_koolgame_udp", "ss_basic_ss_v2ray_plugin", "ss_basic_ss_v2ray_plugin_opts", "ss_basic_rss_protocol", "ss_basic_naive_protocol","ss_basic_naive_user","ss_basic_rss_protocol_param", "ss_basic_rss_obfs", "ss_basic_rss_obfs_param", "ssconf_basic_test_node", "ssconf_basic_test_domain", "ss_dns_china", "ss_dns_china_user", "ss_foreign_dns", "ss_dns2socks_user", "ss_chinadns_user", "ss_chinadns1_user",  "ss_sstunnel_user", "ss_direct_user", "ss_game2_dns_foreign", "ss_game2_dns2ss_user", "ss_basic_kcp_lserver", "ss_basic_kcp_lport", "ss_basic_kcp_server", "ss_basic_kcp_port", "ss_basic_kcp_parameter", "ss_basic_rule_update", "ss_basic_rule_update_time", "ssr_subscribe_mode", "ssr_subscribe_obfspara", "ssr_subscribe_obfspara_val", "ss_basic_online_links_goss", "ss_basic_node_update", "ss_basic_node_update_day", "ss_basic_node_update_hr", "ss_base64_links", "ss_basic_refreshrate", "ss_acl_default_port", "ss_online_action", "ss_acl_default_mode", "ss_basic_kcp_method", "ss_basic_kcp_password", "ss_basic_kcp_mode", "ss_basic_kcp_encrypt", "ss_basic_kcp_mtu", "ss_basic_kcp_sndwnd", "ss_basic_kcp_rcvwnd", "ss_basic_kcp_conn", "ss_basic_kcp_extra", "ss_basic_udp_software", "ss_basic_udp_node", "ss_basic_udpv1_lserver", "ss_basic_udpv1_lport", "ss_basic_udpv1_rserver", "ss_basic_udpv1_rport", "ss_basic_udpv1_password", "ss_basic_udpv1_mode", "ss_basic_udpv1_duplicate_nu", "ss_basic_udpv1_duplicate_time", "ss_basic_udpv1_jitter", "ss_basic_udpv1_report", "ss_basic_udpv1_drop", "ss_basic_udpv2_lserver", "ss_basic_udpv2_lport", "ss_basic_udpv2_rserver", "ss_basic_udpv2_rport", "ss_basic_udpv2_password", "ss_basic_udpv2_fec", "ss_basic_udpv2_timeout", "ss_basic_udpv2_mode", "ss_basic_udpv2_report", "ss_basic_udpv2_mtu", "ss_basic_udpv2_jitter", "ss_basic_udpv2_interval", "ss_basic_udpv2_drop", "ss_basic_udpv2_other", "ss_basic_udp2raw_lserver", "ss_basic_udp2raw_lport", "ss_basic_udp2raw_rserver", "ss_basic_udp2raw_rport", "ss_basic_udp2raw_password", "ss_basic_udp2raw_rawmode", "ss_basic_udp2raw_ciphermode", "ss_basic_udp2raw_authmode", "ss_basic_udp2raw_lowerlevel", "ss_basic_udp2raw_other", "ss_basic_udp_upstream_mtu", "ss_basic_udp_upstream_mtu_value", "ss_basic_v2ray_uuid", "ss_basic_v2ray_alterid","ss_basic_v2ray_protocol", "ss_basic_v2ray_security", "ss_basic_v2ray_network", "ss_basic_v2ray_headtype_tcp", "ss_basic_v2ray_headtype_kcp", "ss_basic_v2ray_network_host", "ss_basic_v2ray_serviceName", "ss_basic_v2ray_network_path", "ss_basic_v2ray_network_tlshost", "ss_basic_trojan_sni", "ss_basic_trojan_binary", "ss_basic_trojan_network", "ss_basic_fingerprint", "ss_basic_v2ray_network_flow", "ss_basic_v2ray_network_security", "ss_basic_v2ray_mux_concurrency", "ss_basic_xray_publicKey", "ss_basic_xray_shortId",	"ss_reboot_check", "ss_basic_week", "ss_basic_day", "ss_basic_inter_min", "ss_basic_inter_hour", "ss_basic_inter_day", "ss_basic_inter_pre", "ss_basic_time_hour", "ss_basic_time_min", "ss_basic_tri_reboot_time", "ss_basic_tri_reboot_policy", "ss_basic_dnsmasq_fastlookup", "ss_basic_server_resolver", "ss_basic_server_resolver_user"];
 	var params_check = ["ss_basic_enable", "ss_basic_use_kcp", "ss_basic_gfwlist_update", "ss_basic_chnroute_update", "ss_basic_cdn_update", "ss_basic_kcp_nocomp", "ss_basic_udp_boost_enable", "ss_basic_udpv1_disable_filter", "ss_basic_udpv2_disableobscure", "ss_basic_udpv2_disablechecksum", "ss_basic_udp2raw_boost_enable", "ss_basic_udp2raw_a", "ss_basic_udp2raw_keeprule", "ss_basic_v2ray_use_json", "ss_basic_v2ray_mux_enable","ss_basic_allowinsecure", "ss_basic_fragment", "ss_basic_dns_hijack", "ss_basic_udp_sync"];
 	var params_base64_a = ["ss_dnsmasq", "ss_wan_white_ip", "ss_wan_white_domain", "ss_wan_black_ip", "ss_wan_black_domain", "ss_online_links"];
-	var params_base64_b = ["ss_basic_password", "ss_basic_custom"];
+	var params_base64_b = ["ss_basic_password", "ss_basic_custom", "ss_basic_hy2_global_json"];
 	// collect data from input
 	for (var i = 0; i < params_input.length; i++) {
 		if (E(params_input[i])) {
@@ -495,7 +654,7 @@ function push_data(obj) {
 }
 
 function decode_show() {
-	var temp_ss = ["ss_dnsmasq", "ss_wan_white_ip", "ss_wan_white_domain", "ss_wan_black_ip", "ss_wan_black_domain", "ss_online_links", "ss_basic_custom"];
+	var temp_ss = ["ss_dnsmasq", "ss_wan_white_ip", "ss_wan_white_domain", "ss_wan_black_ip", "ss_wan_black_domain", "ss_online_links", "ss_basic_custom", "ss_basic_hy2_global_json"];
 	for (var i = 0; i < temp_ss.length; i++) {
 		var el = E(temp_ss[i]);
 		if (!el) {
@@ -503,6 +662,7 @@ function decode_show() {
 		}
 		el.value = Base64.decode(el.value || "");
 	}
+	loadHy2GlobalForm();
 }
 
 function update_ss_ui(obj) {
@@ -3556,7 +3716,7 @@ function set_cron(action) {
 											<img id="return_btn" onclick="reload_Soft_Center();" align="right" style="cursor:pointer;position:absolute;margin-left:-30px;margin-top:-25px;" title="返回软件中心" src="/images/backprev.png" onMouseOver="this.src='/images/backprevclick.png'" onMouseOut="this.src='/images/backprev.png'"></img>
 										</div>
 										<div style="margin-left:5px;margin-top:10px;margin-bottom:10px"><img src="/images/New_ui/export/line_export.png"></div>
-										<div class="SimpleNote" id="head_illustrate"><a target="_blank" href="https://github.com/cary-sas/v2ray_bin" ><em><u>本插件</u></em></a>是支持<a href="https://github.com/shadowsocks/shadowsocks-libev" target="_blank"><em><u>SS</u></em></a>, <a href="https://github.com/shadowsocksrr/shadowsocksr-libev" target="_blank"><em><u>SSR</u></em></a>, <a href="http://firmware.koolshare.cn/binary/koolgame/" target="_blank"><em><u>KoolGame</u></em></a>, <a href="https://github.com/XTLS/Xray-core" target="_blank"><em><u>V2Ray</u></em></a>, <a target="_blank" href="https://github.com/XTLS/Xray-core"><em><u>Xray(Vless, Trojan)</u></em></a>, <a target="_blank" href="https://github.com/gfw-report/trojan-go"><em><u>Trojan-Go</u></em></a>, <a target="_blank" href="https://github.com/klzgrad/naiveproxy/"><em><u>NaiveProxy</u></em></a>, <a target="_blank" href="https://github.com/apernet/hysteria/"><em><u>Hysteria2</u></em></a>, <a target="_blank" href="https://github.com/anytls/anytls-go"><em><u>AnyTLS</u></em></a>十种客户端的科学上网, 游戏加速工具。</div>
+										<div class="SimpleNote" id="head_illustrate"><a target="_blank" href="https://github.com/cary-sas/v2ray_bin" ><em><u>本插件</u></em></a>是支持<a href="https://github.com/shadowsocks/shadowsocks-libev" target="_blank"><em><u>SS</u></em></a>, <a href="https://github.com/shadowsocksrr/shadowsocksr-libev" target="_blank"><em><u>SSR</u></em></a>, <a href="http://firmware.koolshare.cn/binary/koolgame/" target="_blank"><em><u>KoolGame</u></em></a>, <a target="_blank" href="https://github.com/XTLS/Xray-core"><em><u>Xray (Vmess, Vless, Trojan)</u></em></a>, <a target="_blank" href="https://github.com/gfw-report/trojan-go"><em><u>Trojan-Go</u></em></a>, <a target="_blank" href="https://github.com/klzgrad/naiveproxy/"><em><u>NaiveProxy</u></em></a>, <a target="_blank" href="https://github.com/apernet/hysteria/"><em><u>Hysteria2</u></em></a>, <a target="_blank" href="https://github.com/anytls/anytls-go"><em><u>AnyTLS</u></em></a> 的科学上网, 游戏加速工具。</div>
 										<div style="margin-top: 0px;text-align: center;font-size: 18px;margin-bottom: 0px;" class="formfontdesc" id="cmdDesc"></div>
 										<!-- this is the popup area for status -->
 										<div id="detail_status"  class="content_status" style="box-shadow: 3px 3px 10px #000;margin-top: 0px;display: none;">
@@ -3640,7 +3800,7 @@ function set_cron(action) {
 													<td colspan="4" cellpadding="0" cellspacing="0" style="padding:0" border="1" bordercolor="#000">
 														<input id="show_btn1" class="show-btn1" style="cursor:pointer" type="button" value="账号设置" />
 														<input id="show_btn1_1" class="show-btn1_1" style="cursor:pointer" type="button" value="节点管理" />
-														<input id="show_btn2" class="show-btn2" style="cursor:pointer" type="button" value="DNS设定" />
+														<input id="show_btn2" class="show-btn2" style="cursor:pointer" type="button" value="全局设定" />
 														<input id="show_btn3" class="show-btn3" style="cursor:pointer" type="button" value="黑白名单" />
 														<input id="show_btn3_1" class="show-btn3_1" style="cursor:pointer" type="button" value="KCP加速" />
 														<input id="show_btn3_2" class="show-btn3_2" style="cursor:pointer" type="button" value="UDP加速"/>
@@ -3719,7 +3879,7 @@ function set_cron(action) {
 																</td>
 															</tr>
 															<tr id="trojan_binary_tr" style="display: none;">
-																<th width="35%">协议（Trojan/Trojan-Go/Hysteria2/AnyTLS）</th>
+																<th width="35%"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(108)">协议（Trojan/Trojan-Go/Hysteria2/AnyTLS）</a></th>
 																<td>
 																	<select id="ss_node_table_trojan_binary" name="ss_node_table_trojan_binary" style="width:350px;margin:0px 0px 0px 2px;" class="input_ss_table" onchange="trojan_change_off(this.value);">
 																		<option value="Trojan" >Trojan</option>
@@ -3754,7 +3914,7 @@ function set_cron(action) {
 																</td>
 															</tr>
 															<tr id="trojan_network_tr" style="display: none;">
-																<th width="35%">Trojan Go 混淆</th>
+																<th width="35%"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(119)">Trojan Go 混淆</a></th>
 																<td>
 																	<select id="ss_node_table_trojan_network" name="ss_node_table_trojan_network" style="width:350px;margin:0px 0px 0px 2px;" class="input_ss_table" onchange="network_change_off(this.value);">
 																		<option value="0" selected >none</option>
@@ -3931,7 +4091,7 @@ function set_cron(action) {
 																</td>
 															</tr>
 															<tr id="v2ray_serviceName_tr" style="display: none;">
-																<th width="35%">serviceName</th>
+																<th width="35%"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(120)">serviceName</a></th>
 																<td>
 																	<input type="text" name="ss_node_table_v2ray_serviceName" id="ss_node_table_v2ray_serviceName"  class="input_ss_table" placeholder="没有请留空" style="width:342px;" maxlength="300" value=""/>
 																</td>
@@ -3966,7 +4126,7 @@ function set_cron(action) {
 															</tr>
 															<tr id="v2ray_network_tlshost_tr" style="display: none;">
 																<th width="35%">
-																	<a class="hintstyle" href="javascript:void(0);" onclick="openssHint(28)">tls/xtls域名 (SNI)</a>
+																	<a class="hintstyle" href="javascript:void(0);" onclick="openssHint(110)">tls/xtls域名 (SNI)</a>
 																</th>
 																<td>
 																	<input type="text" name="ss_node_table_v2ray_network_tlshost" id="ss_node_table_v2ray_network_tlshost" class="input_ss_table"  placeholder="没有请留空"  style="width:342px;" maxlength="300" value="" />
@@ -3990,7 +4150,7 @@ function set_cron(action) {
 															</tr>
 															<tr id="trojan_sni_tr" style="display: none;">
 																<th width="35%">
-																	<a class="hintstyle" href="javascript:void(0);" onclick="openssHint(28)">tls/xtls域名 (SNI)</a>
+																	<a class="hintstyle" href="javascript:void(0);" onclick="openssHint(110)">tls/xtls域名 (SNI)</a>
 																</th>
 																<td>
 																	<input type="text" name="ss_node_table_trojan_sni" id="ss_node_table_trojan_sni" class="input_ss_table"  placeholder="没有请留空"  style="width:342px;" maxlength="300" value="" />
@@ -4017,13 +4177,13 @@ function set_cron(action) {
 																</td>
 															</tr>	
 															<tr id="allowinsecure_tr" style="display: none;">
-																<th width="35%">允许不安全</th>
+																<th width="35%"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(112)">允许不安全</a></th>
 																<td>
 																	<input type="checkbox" id="ss_node_table_allowinsecure" name="ss_node_table_allowinsecure" onclick="verifyFields(this, 1);" value="0">
 																</td>
 															</tr>	
 															<tr id="fragment_tr" style="display: none;">
-																<th width="35%">开启片段</th>
+																<th width="35%"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(117)">开启片段</a></th>
 																<td>
 																	<input type="checkbox" id="ss_node_table_fragment" name="ss_node_table_fragment" onclick="verifyFields(this, 1);" value="0">
 																</td>
@@ -4311,7 +4471,7 @@ function set_cron(action) {
 												</tr>
 												<tr id="trojan_network_basic_tr" style="display: none;">
 													<th width="35%">
-														<a class="hintstyle" href="javascript:void(0);" onclick="openssHint(108)"><font color="#ffcc00">Trojan 混淆</font></a>
+														<a class="hintstyle" href="javascript:void(0);" onclick="openssHint(119)"><font color="#ffcc00">Trojan 混淆</font></a>
 													</th>
 													<td>
 														<select id="ss_basic_trojan_network" name="ss_basic_trojan_network" style="width:164px;margin:0px 0px 0px 2px;" class="input_option"  onchange="verifyFields(this, 1);">
@@ -4362,7 +4522,7 @@ function set_cron(action) {
 												</tr>
 												<tr id="v2ray_serviceName_basic_tr" style="display: none;">
 													<th width="35%">
-														<a class="hintstyle" href="javascript:void(0);" onclick="openssHint(29)"><font color="#ffcc00">&nbsp;&nbsp;* 服务名称 (ServiceName)</font></a>
+														<a class="hintstyle" href="javascript:void(0);" onclick="openssHint(120)"><font color="#ffcc00">&nbsp;&nbsp;* 服务名称 (ServiceName)</font></a>
 													</th>
 													<td>
 														<input type="text" name="ss_basic_v2ray_serviceName" id="ss_basic_v2ray_serviceName" class="input_ss_table"  maxlength="300" value=""/>
@@ -4541,14 +4701,14 @@ function set_cron(action) {
 												<tr>
 													<th style="width:20%;">延迟测试</th>
 													<td>
-														<input class="ss_btn" style="cursor:pointer;" onClick="web_test()" type="button" value="开始测试"/>
-															<select id="ssconf_basic_test_node" name="ssconf_basic_test_node" style="width:124px;margin:0px 0px 0px 2px;" class="input_option">
-															</select>
+														<select id="ssconf_basic_test_node" name="ssconf_basic_test_node" style="width:124px;margin:0px 0px 0px 2px;" class="input_option">
+														</select>
 														<select id="ssconf_basic_test_domain" name="ssconf_basic_test_domain" style="width:160px;margin:0px 0px 0px 2px;" class="input_option">
 															<option class="content_input_fd" value="https://www.google.com.hk/">google</option>
 															<option class="content_input_fd" value="https://www.gstatic.com/generate_204">gstatic</option>
 														</select>
 														<input class="ss_btn" style="cursor:pointer;" onClick="remove_test()" type="button" value="清空结果"/>
+														<input class="ss_btn" style="cursor:pointer;" onClick="web_test()" type="button" value="开始测试"/>
 													</td>
 												</tr>
 											</table>
@@ -4612,7 +4772,7 @@ function set_cron(action) {
 													</td>
 												</tr>
 												<tr id="dns_plan_foreign_game2" style="display: none;">
-												<th width="20%"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(47)">选择国外DNS</a></th>
+												<th width="20%"><a class="hintstyle" href="javascript:void(0);" onclick="openssHint(26)">选择国外DNS</a></th>
 													<td>
 														<select id="ss_game2_dns_foreign" name="ss_game2_dns_foreign" class="input_option" onclick="update_visibility();" disabled="disabled" >
 															<option value="1" selected>koolgame内置</option>
@@ -4626,12 +4786,6 @@ function set_cron(action) {
 													<th>DNS劫持（原chromecast功能）&nbsp;&nbsp;<a class="hintstyle" href="javascript:void(0);" onclick="openssHint(106)"><font color="#ffcc00"><u>[说明]</u></font></a></th>
 													<td>
 														<input type="checkbox" id="ss_basic_dns_hijack" onclick="verifyFields(this, 1);" checked="" />
-													</td>
-												</tr>
-												<tr>
-													<th>同步UDP与TCP&nbsp;&nbsp;<a class="hintstyle" href="javascript:void(0);" onclick="openssHint(116)"><font color="#ffcc00"><u>[说明]</u></font></a></th>
-													<td>
-														<input type="checkbox" id="ss_basic_udp_sync" onclick="verifyFields(this, 1);" />
 													</td>
 												</tr>
 												<tr>
@@ -4662,6 +4816,60 @@ function set_cron(action) {
 address=/weibo.com/2.2.2.2
 # 防DNS劫持设置：
 bogus-nxdomain=220.250.64.18" rows="12" style="width:99%; font-family:'Lucida Console'; font-size:12px;background:#475A5F;color:#FFFFFF;" id="ss_dnsmasq" name="ss_dnsmasq" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" title=""></textarea>
+													</td>
+												</tr>
+												<tr>
+													<th>同步UDP与TCP&nbsp;&nbsp;<a class="hintstyle" href="javascript:void(0);" onclick="openssHint(116)"><font color="#ffcc00"><u>[说明]</u></font></a></th>
+													<td>
+														<input type="checkbox" id="ss_basic_udp_sync" onclick="verifyFields(this, 1);" />
+													</td>
+												</tr>
+												<tr>
+													<th width="20%">Hysteria2 全局设定&nbsp;&nbsp;<a class="hintstyle" href="javascript:void(0);" onclick="openssHint(118)"><font color="#ffcc00"><u>[说明]</u></font></a><br><span style="color:#FC0;font-weight:normal;">默认不填</span></th>
+													<td>
+														<div style="line-height:32px;">
+															<span style="display:inline-block;width:70px;">混淆</span>
+															<select id="ss_basic_hy2_obfs_type" name="ss_basic_hy2_obfs_type" class="input_option" style="width:155px;" onchange="updateHy2GlobalForm();">
+																<option value="">关闭</option>
+																<option value="salamander">salamander</option>
+																<option value="gecko">gecko</option>
+															</select>
+															<span id="ss_basic_hy2_obfs_password_span" style="display:none;margin-left:8px;">
+																密码
+																<input type="text" class="input_ss_table" id="ss_basic_hy2_obfs_password" name="ss_basic_hy2_obfs_password" style="width:190px;" placeholder="混淆密码" value="">
+															</span>
+															<br id="ss_basic_hy2_gecko_br" style="display:none;">
+															<span id="ss_basic_hy2_gecko_span" style="display:none;margin-left:70px;">
+																包大小
+																<input type="text" class="input_ss_table" id="ss_basic_hy2_gecko_min" name="ss_basic_hy2_gecko_min" style="width:60px;" placeholder="512" value="">
+																-
+																<input type="text" class="input_ss_table" id="ss_basic_hy2_gecko_max" name="ss_basic_hy2_gecko_max" style="width:60px;" placeholder="1200" value="">
+															</span>
+															<br>
+															<span style="display:inline-block;width:70px;">拥塞控制</span>
+															<select id="ss_basic_hy2_congestion_type" name="ss_basic_hy2_congestion_type" class="input_option" style="width:175px;" onchange="updateHy2GlobalForm();">
+																<option value="">默认(bbr + standard)</option>
+																<option value="bbr">bbr</option>
+																<option value="reno">reno</option>
+															</select>
+															<span id="ss_basic_hy2_bbr_profile_span" style="display:none;margin-left:8px;">
+																BBR模式
+																<select id="ss_basic_hy2_bbr_profile" name="ss_basic_hy2_bbr_profile" class="input_option" style="width:140px;">
+																	<option value="standard">standard</option>
+																	<option value="conservative">conservative</option>
+																	<option value="aggressive">aggressive</option>
+																</select>
+															</span>
+															<br>
+															<span style="display:inline-block;width:70px;">带宽</span>
+															上行
+															<input type="text" class="input_ss_table" id="ss_basic_hy2_bandwidth_up_value" name="ss_basic_hy2_bandwidth_up_value" style="width:70px;" placeholder="100" value="">
+															<span style="margin:0px 12px 0px 4px;">mbps</span>
+															下行
+															<input type="text" class="input_ss_table" id="ss_basic_hy2_bandwidth_down_value" name="ss_basic_hy2_bandwidth_down_value" style="width:70px;" placeholder="200" value="">
+															<span style="margin-left:4px;">mbps</span>
+														</div>
+														<textarea id="ss_basic_hy2_global_json" name="ss_basic_hy2_global_json" style="display:none;"></textarea>
 													</td>
 												</tr>
 											</table>

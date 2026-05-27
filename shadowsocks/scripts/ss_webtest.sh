@@ -229,14 +229,6 @@ get_fingerprint(){
 		echo "null"
 	fi
 }
-get_tgfingerprint(){
-	if [ -n "$1" ];then
-		echo "$1"
-	else
-		echo "null"
-	fi
-}
-
 create_v2ray_json(){
 
 	rm -f /tmp/tmp_v2ray.json
@@ -698,69 +690,82 @@ rm -f /tmp/tmp_v2ray.json
 
 
 create_trojango_json(){
-	rm -f /tmp/tmp2_trojango.json
+	rm -f /tmp/tmp_v2ray.json
+
+	local trojan_sni="$(eval echo \$ssconf_basic_trojan_sni_$nu)"
+	local trojango_network="tcp"
+	local ws_settings="null"
+	local mux_concurrency="$(eval echo \$ssconf_basic_v2ray_mux_concurrency_$nu)"
+
+	[ -z "$mux_concurrency" ] && mux_concurrency=8
+	[ -z "$trojan_sni" ] && [ -n "$(eval echo \$ssconf_basic_v2ray_network_host_$nu)" ] && trojan_sni="$(eval echo \$ssconf_basic_v2ray_network_host_$nu)"
+
 	if [ "$(eval echo \$ssconf_basic_trojan_network_$nu)" == "1" ]; then
 		[ -n "$(eval echo \$ssconf_basic_v2ray_network_path_$nu)" ] && local ssconf_basic_v2ray_network_path=$(echo "/"$(eval echo \$ssconf_basic_v2ray_network_path_$nu)"" | sed 's,//,/,')
 		[ -n "$(eval echo \$ssconf_basic_v2ray_network_host_$nu)" ] && local ssconf_basic_v2ray_network_host=$(eval echo \$ssconf_basic_v2ray_network_host_$nu)
-		local ws="{ \"enabled\": true,
-					\"path\":  \"$ssconf_basic_v2ray_network_path\",
-					\"host\":  \"$ssconf_basic_v2ray_network_host\"
-					}"
-	else
-		local ws="{ \"enabled\": false,
-					\"path\":  \"\",
-					\"host\":  \"\"
-					}"
+		trojango_network="ws"
+		ws_settings="{\"path\": \"$ssconf_basic_v2ray_network_path\", \"headers\": {\"Host\": \"$ssconf_basic_v2ray_network_host\"}}"
 	fi
-		local local_fingerprint=$(eval echo \$ssconf_basic_fingerprint_$nu)
-		 #trojan go
 
-		 #  23458 for socks5  
-		cat >"/tmp/tmp2_trojango.json" <<-EOF
-			{
-				"run_type": "client",
-				"local_addr": "127.0.0.1",
-				"local_port": 23458,
-				"remote_addr": "$array1",
-				"remote_port": $array2,
-				"log_level": 5,
-				"log_file": "/tmp/trojan-go_webtest_log.log",
-				"password": [
-				"$array3"
-				],
-				"disable_http_check": false,
-				"udp_timeout": 60,
-				"ssl": {
-					"verify": true,
-					"verify_hostname": true,
-					"sni": "$(eval echo \$ssconf_basic_trojan_sni_$nu)",
-					"alpn": [
-					"http/1.1"
-					],
-					"session_ticket": true,
-					"reuse_session": true,
-					"fingerprint": $(get_tgfingerprint $ss_basic_fingerprint)
-				},
-				"tcp": {
-					"no_delay": true,
-					"keep_alive": true,
-					"prefer_ipv4": true
-				},
-				"mux": {
-					"enabled": $(get_function_switch $(eval echo \$ssconf_basic_v2ray_mux_enable_$nu)),
-					"concurrency": 8,
-					"idle_timeout": 60
-				},
-				"websocket": $ws
-				,
-				"shadowsocks": {
-					"enabled": false,
-					"method": "AES-128-GCM",
-					"password": ""
+	cat >"/tmp/tmp_v2ray.json" <<-EOF
+		{
+			"log": {
+				"access": "/dev/null",
+				"error": "/tmp/v2ray_webtest_log.log",
+				"loglevel": "error"
+			},
+			"inbounds": [
+				{
+					"tag": "webtest-socks",
+					"port": 23458,
+					"listen": "0.0.0.0",
+					"protocol": "socks",
+					"settings": {
+						"auth": "noauth",
+						"udp": false,
+						"ip": "127.0.0.1",
+						"clients": null
+					},
+					"streamSettings": null
 				}
-			}
-		EOF
-	
+			],
+			"outbounds": [
+				{
+					"tag": "agentout",
+					"protocol": "trojan-go",
+					"settings": {
+						"trojanGoMux": {
+							"enabled": $(get_function_switch $(eval echo \$ssconf_basic_v2ray_mux_enable_$nu)),
+							"concurrency": $mux_concurrency,
+							"idle_timeout": 60
+						},
+						"servers": [
+							{
+								"address": "$array1",
+								"port": $array2,
+								"password": "$array3"
+							}
+						]
+					},
+					"streamSettings": {
+						"network": "$trojango_network",
+						"security": "tls",
+						"tlsSettings": {
+							"allowInsecure": $(get_function_switch $(eval echo \$ssconf_basic_allowinsecure_$nu)),
+							"serverName": "$trojan_sni",
+							"alpn": ["http/1.1"],
+							"fingerprint": $(get_fingerprint $(eval echo \$ssconf_basic_fingerprint_$nu))
+						},
+						"wsSettings": $ws_settings
+					},
+					"mux": {
+						"enabled": false,
+						"concurrency": 1
+					}
+				}
+			]
+		}
+	EOF
 }
 
 create_naive_json(){
@@ -777,7 +782,7 @@ create_naive_json(){
 }
 
 create_hy2_json(){
-	rm -f /tmp/tmp_hysteria.json 
+	rm -f /tmp/tmp_hysteria.json /tmp/tmp_hysteria_global.json /tmp/tmp_hysteria.final.json
 
 	cat >/tmp/tmp_hysteria.json <<-EOF
 				{
@@ -794,6 +799,18 @@ create_hy2_json(){
 				}
 			}
 	EOF
+
+	hy2_global_json="$(dbus get ss_basic_hy2_global_json)"
+	if [ -n "$hy2_global_json" ]; then
+		echo "$hy2_global_json" | base64_decode > /tmp/tmp_hysteria_global.json
+		if jq -e 'type == "object" and length > 0 and (length == ([keys_unsorted[] | select(. == "obfs" or . == "congestion" or . == "bandwidth")] | length))' /tmp/tmp_hysteria_global.json >/dev/null 2>&1; then
+			jq -s '.[0] * .[1]' /tmp/tmp_hysteria.json /tmp/tmp_hysteria_global.json > /tmp/tmp_hysteria.final.json && mv /tmp/tmp_hysteria.final.json /tmp/tmp_hysteria.json
+			echo_date "webtest: Hysteria2 global config merged."
+		else
+			echo_date "webtest: Hysteria2 global config invalid, skipped."
+		fi
+		rm -f /tmp/tmp_hysteria_global.json /tmp/tmp_hysteria.final.json
+	fi
 }
 
 create_ss2022_json(){
@@ -951,10 +968,17 @@ start_webtest(){
 
 		elif [ "$array12" == "4" -a "$array14" == "Trojan-Go" ];then   #trojan go
 			create_trojango_json 
-			trojan-go -config=/tmp/tmp2_trojango.json >/dev/null 2>&1 &
+			xray run -config=/tmp/tmp_v2ray.json >/dev/null 2>&1 &
+			local i=0
+			while [ "$i" -lt 20 ]
+			do
+				netstat -nl 2>/dev/null | grep -q '[:.]23458[[:space:]]' && break
+				sleep 1
+				i=$((i + 1))
+			done
 			speed_test_curl
-			kill -9 `ps|grep 'trojan-go' | grep 'tmp2_trojango'|awk '{print $1}'` >/dev/null 2>&1
-			rm -f /tmp/tmp_trojango.json /tmp/tmp2_trojango.json /tmp/trojan-go_webtest_log.log
+			kill -9 `ps|grep xray|grep 'tmp_v2ray'|awk '{print $1}'` >/dev/null 2>&1
+			rm -f /tmp/tmp_v2ray.json /tmp/v2ray_webtest_log.log
 
 		elif [ "$array12" == "4" -a "$array14" == "Hysteria2" ];then   #Hysteria2
 			create_hy2_json 

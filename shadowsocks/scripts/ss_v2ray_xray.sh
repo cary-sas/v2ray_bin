@@ -34,7 +34,7 @@ HY2_CONFIG_FILE="/koolshare/ss/hysteria.json"
 
 url_main="https://raw.githubusercontent.com/cary-sas/v2ray_bin/main/380_armv5/$core_bin"
 url_back=""
-socksopen_b=`netstat -nlp|grep -w 23456|grep -E "local|xray|trojan-go|naive|hysteria|anytls"`
+socksopen_b=`netstat -nlp|grep -w 23456|grep -E "local|xray|naive|hysteria|anytls"`
 if [ -n "$socksopen_b" ] && [ "$ss_basic_online_links_goss" == "1" ];then
 	echo_date "代理有开启，将使用代理网络..."
 	alias curlxx='curl --connect-timeout 8 -k --socks5-hostname 127.0.0.1:23456 '
