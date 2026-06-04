@@ -558,22 +558,8 @@ create_v2ray_json(){
 					"enabled": $(get_function_switch $(eval echo \$ssconf_basic_v2ray_mux_enable_$nu)),
 					"concurrency": 8
 				}
-			},
-			{
-				"tag": "direct",
-				"protocol": "freedom",
-				"settings": {}
 			}
-		],
-		"routing": {
-			"rules": [
-				{
-					"type": "field",
-					"inboundTag": ["socks-in"],
-					"outboundTag": "agentout"
-				}
-			]
-		}
+		]
 		}
 		EOF
 
@@ -615,22 +601,8 @@ create_v2ray_json(){
 					"enabled": $(get_function_switch $(eval echo \$ssconf_basic_v2ray_mux_enable_$nu)),
 					"concurrency": 8
 				}
-			},
-			{
-				"tag": "direct",
-				"protocol": "freedom",
-				"settings": {}
 			}
-		],
-		"routing": {
-			"rules": [
-				{
-					"type": "field",
-					"inboundTag": ["socks-in"],
-					"outboundTag": "agentout"
-				}
-			]
-		}
+		]
 		}
 		EOF
 	fi

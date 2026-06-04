@@ -929,6 +929,7 @@ function verifyFields(r) {
 			showhide("v2ray_mux_concurrency_tr", (E("ss_node_table_v2ray_mux_enable").checked));
 			showhide("v2ray_json_tr", (E("ss_node_table_v2ray_use_json").checked));
 			showhide("v2ray_alterid_tr", (E("ss_node_table_v2ray_protocol").value == "vmess"));
+			showhide("fingerprint_tr", true);
 			showhide("xray_publicKey_tr", reality_on_2);
 			showhide("xray_shortId_tr", reality_on_2);
 		}
@@ -1693,6 +1694,7 @@ function tabclickhandler(_type) {
 			E('v2ray_mux_enable_tr').style.display = "none";
 			E('v2ray_mux_concurrency_tr').style.display = "none";
 			E('v2ray_json_tr').style.display = "";
+			E('fingerprint_tr').style.display = "none";
 		}else{
 			E('ss_server_support_tr').style.display = "";
 			E('ss_port_support_tr').style.display = "";
@@ -1738,6 +1740,7 @@ function tabclickhandler(_type) {
 			showhide("v2ray_mux_concurrency_tr", (E("ss_node_table_v2ray_mux_enable").checked));
 			showhide("v2ray_json_tr", (E("ss_node_table_v2ray_use_json").checked));
 			showhide("v2ray_alterid_tr", (E("ss_node_table_v2ray_protocol").value == "vmess"));
+			showhide("fingerprint_tr", true);
 		}
 	}else if (_type == 4) {
 	    // 添加 Trojan 节点的界面
